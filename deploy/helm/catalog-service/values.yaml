@@ -9,11 +9,11 @@ appVersion: "1.0.0"
 nameOverride: ""
 fullnameOverride: ""
 
-containerPort: 8000
+containerPort: 8082
 
 service:
   type: ClusterIP
-  port: 8000
+  port: 8082
 
 health:
   path: /health

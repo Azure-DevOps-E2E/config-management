@@ -31,7 +31,7 @@ env:
   - name: USER_SERVICE_URL
     value: "http://user-service:8081"
   - name: CATALOG_SERVICE_URL
-    value: "http://catalog-service:8000"
+    value: "http://catalog-service:8082"
   - name: ORDER_SERVICE_URL
     value: "http://order-service:8083"
 

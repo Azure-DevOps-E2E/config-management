@@ -1,0 +1,8 @@
+parameters:
+  - name: pipelineStages
+    type: stageList
+    default: []
+
+stages:
+  - ${{ each pipelineStage in parameters.pipelineStages }}:
+      - ${{ pipelineStage }}

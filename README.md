@@ -1,14 +1,236 @@
-# DevOps
+# NexusCart Configuration Management
 
-Repository này là nơi tích hợp và triển khai toàn bộ hệ thống: Docker Compose cho
-local/E2E, Helm chart cho AKS, Azure Pipelines template dùng chung và các script
-health/smoke. Runtime API Gateway nằm trong repository `api-gateway`, không nằm
-trong repository này.
+This repository owns the configuration used to integrate, verify, and deploy
+the NexusCart system. It contains local Docker Compose orchestration, Helm
+charts for AKS, the shared Azure Pipeline contract, operational scripts, and
+the shared API contract.
 
-## Repository layout
+Application source remains in the five sibling runtime repositories.
+
+## ✨ Highlights
+
+- Full-stack Docker Compose environment for local development and E2E testing.
+- One Helm chart per deployable component.
+- DEV and PROD resource overrides for AKS.
+- Minimal Azure Pipeline contract with repository-owned stages, jobs, and steps.
+- Cross-repository system E2E pipeline.
+- Health, readiness-wait, and order smoke-test scripts.
+- Central API contract for users, products, orders, errors, and health.
+- Immutable deployment versions based on Azure Pipeline build IDs.
+
+## 🏗️ Application Architecture
+
+| Component | Runtime | Internal port | Role |
+|---|---|---:|---|
+| `frontend` | React, Vite, NGINX | `80` | Storefront UI |
+| `api-gateway` | Node.js HTTP | `8080` | Public entry point, routing, and health dashboard |
+| `user-service` | Go, Gin | `8081` | Seeded customer data |
+| `catalog-service` | Python, FastAPI | `8082` | Product, price, and stock data |
+| `order-service` | Java, Spring Boot | `8083` | Order validation, totals, and in-memory storage |
+
+```mermaid
+flowchart LR
+    B[Browser] -->|Port 8080| G[API Gateway]
+    G --> F[Frontend]
+    G --> U[User Service]
+    G --> C[Catalog Service]
+    G --> O[Order Service]
+    O -->|Validate user| U
+    O -->|Read price and stock| C
+```
+
+Only the API Gateway publishes a host port in Compose and a public
+`LoadBalancer` service in Kubernetes. All other components stay on the
+internal application network.
+
+## 🗂️ Multi-Repository Layout
+
+Clone all six repositories as siblings. Compose build contexts and the E2E
+pipeline rely on this layout:
 
 ```text
-devops/
+AzureDevOps/
+├── frontend/
+├── api-gateway/
+├── user-service/
+├── catalog-service/
+├── order-service/
+└── config-management/
+```
+
+## 🚀 Run the Full Stack
+
+### Prerequisites
+
+- Docker Engine with Docker Compose v2.
+- All six repositories in the sibling layout shown above.
+
+From `config-management`:
+
+```powershell
+Copy-Item .env.example .env
+docker compose config --quiet
+docker compose up --build --detach --wait
+```
+
+Open:
+
+- Storefront: <http://localhost:8080>
+- Health dashboard: <http://localhost:8080/health>
+- Gateway health JSON: <http://localhost:8080/health/api-gateway>
+
+Verify the integrated system:
+
+```powershell
+./scripts/health.ps1 -BaseUrl http://localhost:8080
+./scripts/smoke.ps1 -BaseUrl http://localhost:8080
+```
+
+The smoke test reads users and products, creates an order through the public
+gateway, and reads the saved order back.
+
+Stop the environment:
+
+```powershell
+docker compose down --remove-orphans
+```
+
+To expose a different host port or health version:
+
+```powershell
+$env:APP_PORT = "9080"
+$env:APP_VERSION = "local-2"
+docker compose up --build --detach --wait
+```
+
+The application is then available at <http://localhost:9080>.
+
+## ⚙️ Compose Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `APP_PORT` | `8080` | Host port published by the API Gateway |
+| `APP_VERSION` | `1.0.0` | Version reported by every component |
+| `FRONTEND_URL` | `http://frontend:80` | Gateway frontend target |
+| `USER_SERVICE_URL` | `http://user-service:8081` | Gateway and Order user target |
+| `CATALOG_SERVICE_URL` | `http://catalog-service:8082` | Gateway and Order catalog target |
+| `ORDER_SERVICE_URL` | `http://order-service:8083` | Gateway order target |
+
+Copy `.env.example` to `.env` for persistent local overrides. Do not commit
+credentials or environment-specific secrets to this file.
+
+## 🌐 Public Routes
+
+| Path | Destination |
+|---|---|
+| `/` and non-API paths | Frontend |
+| `/api/v1/users/*` | User Service |
+| `/api/v1/products/*` | Catalog Service |
+| `/api/v1/orders/*` | Order Service |
+| `/health` | Integrated health dashboard |
+| `/health/{component}` | Stable component health route |
+
+All payloads use `camelCase`, timestamps use ISO 8601 UTC, and VND amounts are
+integers. See [docs/api-contract.md](docs/api-contract.md) for request, response,
+and error examples.
+
+## 🩺 Operational Scripts
+
+| Script | Purpose |
+|---|---|
+| `scripts/wait-health.ps1` | Polls all component health routes until ready or timed out |
+| `scripts/health.ps1` | Reports component status, version, latency, and optional version match |
+| `scripts/smoke.ps1` | Runs an end-to-end read/create/read order scenario |
+
+Verify one deployed service reports the expected immutable version:
+
+```powershell
+./scripts/health.ps1 \
+  -BaseUrl https://dev.example.com \
+  -ExpectedService order-service \
+  -ExpectedVersion 1234
+```
+
+## 🔁 CI/CD Flow
+
+Each runtime repository owns its pipeline variables and composes three local
+stage templates:
+
+```text
+pipelines/stages/ci.yml
+pipelines/stages/deploy-dev.yml
+pipelines/stages/deploy-prod.yml
+```
+
+Its root `azure-pipelines.yml` passes those stages to the minimal shared
+contract at `devops/pipelines/templates/pipeline-contract.yml`. The contract
+only accepts and renders a `stageList`; it does not own repository-specific
+variables, stages, jobs, or steps.
+
+```mermaid
+flowchart LR
+    C[Commit or PR] --> T[Test]
+    C --> B[Build image]
+    C --> S[Trivy scan]
+    T --> M{main?}
+    B --> M
+    S --> M
+    M -->|No| E[End]
+    M -->|Yes| A[Push to ACR]
+    A --> D[Deploy DEV]
+    D --> V[Health and smoke]
+    V --> P[Manual approval]
+    P --> R[Deploy PROD]
+```
+
+The separate `pipelines/system-e2e.yml` pipeline checks out all six
+repositories, starts the Compose stack, validates health and ordering behavior,
+and publishes Compose diagnostics if the test fails.
+
+See [pipelines/README.md](pipelines/README.md) for Azure DevOps setup, required
+variables, image tagging, pipeline creation, and bootstrap deployment.
+
+## ☸️ Helm and AKS
+
+| Chart | Service type | DEV replicas | PROD replicas |
+|---|---|---:|---:|
+| `frontend` | `ClusterIP` | 1 | 2 |
+| `user-service` | `ClusterIP` | 1 | 2 |
+| `catalog-service` | `ClusterIP` | 1 | 2 |
+| `order-service` | `ClusterIP` | 1 | 1 |
+| `api-gateway` | `LoadBalancer` | 1 | 2 |
+
+Order Service remains at one PROD replica because its current storage is
+process-local. Add shared persistence before scaling it horizontally.
+
+Validate the charts:
+
+```bash
+for chart in frontend user-service catalog-service order-service api-gateway; do
+  helm lint "deploy/helm/$chart"
+  helm template "$chart" "deploy/helm/$chart" >/dev/null
+done
+```
+
+Example DEV deployment:
+
+```bash
+helm upgrade --install api-gateway deploy/helm/api-gateway \
+  --namespace dev \
+  --create-namespace \
+  --values deploy/helm/api-gateway/values-dev.yaml \
+  --set image.repository=example.azurecr.io/api-gateway \
+  --set image.tag=1234 \
+  --set appVersion=1234
+```
+
+Replace the example registry and tag with real ACR values. The pipeline applies
+the same overrides automatically.
+
+## 📁 Repository Structure
+
+```text
+config-management/
 ├── compose.yaml
 ├── deploy/helm/
 │   ├── api-gateway/
@@ -16,154 +238,29 @@ devops/
 │   ├── frontend/
 │   ├── order-service/
 │   └── user-service/
-├── docs/api-contract.md
+├── docs/
+│   └── api-contract.md
 ├── pipelines/
+│   ├── stages/e2e.yml
+│   ├── templates/pipeline-contract.yml
+│   ├── templates/service-pipeline.yml    # Legacy rollback template
 │   ├── system-e2e.yml
-│   └── templates/service-pipeline.yml
-└── scripts/
-    ├── health.ps1
-    ├── smoke.ps1
-    └── wait-health.ps1
+│   └── README.md
+├── scripts/
+│   ├── health.ps1
+│   ├── smoke.ps1
+│   └── wait-health.ps1
+├── .env.example
+└── README.md
 ```
 
-Sáu repository cần được clone cạnh nhau:
+## 🧩 Ownership Boundaries
 
-```text
-AzureDevOps/
-├── frontend/
-├── user-service/
-├── catalog-service/
-├── order-service/
-├── api-gateway/
-└── devops/
-```
-
-## Request flow
-
-```mermaid
-flowchart LR
-    U[Người dùng] --> B[Browser]
-    B -->|GET /| G[API Gateway]
-    G -->|HTML/CSS/JS| F[Frontend]
-    B -->|JavaScript gọi /api/v1/...| G
-    G -->|/users| US[User Service]
-    G -->|/products| CS[Catalog Service]
-    G -->|/orders| OS[Order Service]
-    OS -->|validate user| US
-    OS -->|validate product và price| CS
-```
-
-Người dùng tương tác với giao diện React. Browser nhận frontend qua gateway và
-các request do frontend tạo tiếp tục dùng URL tương đối `/api/v1/...`, vì vậy
-browser chỉ giao tiếp với một origin. Các backend và frontend không publish cổng
-ra host khi chạy Compose; chỉ `api-gateway` publish cổng `8080`.
-
-## Chạy toàn bộ hệ thống
-
-Yêu cầu Docker Engine có Compose v2. Từ repository này:
-
-```powershell
-Copy-Item .env.example .env
-docker compose up --build --detach --wait
-```
-
-Mở:
-
-- Ứng dụng: <http://localhost:8080>
-- Dashboard health: <http://localhost:8080/health>
-- Gateway health JSON: <http://localhost:8080/health/api-gateway>
-
-Kiểm tra toàn hệ thống:
-
-```powershell
-./scripts/health.ps1 -BaseUrl http://localhost:8080
-./scripts/smoke.ps1 -BaseUrl http://localhost:8080
-```
-
-Dừng stack:
-
-```powershell
-docker compose down --remove-orphans
-```
-
-Đổi version trả về từ tất cả health endpoint:
-
-```powershell
-$env:APP_VERSION = "local-2"
-docker compose up --build --detach --wait
-```
-
-## Chạy từng service
-
-Mỗi runtime repo có README riêng và có thể chạy native:
-
-| Repository | Runtime | Cổng mặc định | Lệnh chính |
-|---|---|---:|---|
-| `frontend` | React, Vite | 5173 | `npm install`, `npm run dev` |
-| `user-service` | Go, Gin | 8081 | `go run ./cmd/server` |
-| `catalog-service` | Python, FastAPI | 8000 | `uvicorn app.main:app --port 8000` |
-| `order-service` | Java, Spring Boot | 8083 | `./mvnw spring-boot:run` |
-| `api-gateway` | Node.js HTTP | 8080 | `npm ci`, `npm start` |
-
-Khi chạy native, `order-service` cần URL của User/Catalog và `api-gateway` cần
-URL của cả bốn upstream. Xem biến môi trường cụ thể trong README của từng repo.
-
-## Public routes
-
-| Path | Destination |
+| Repository | Owns |
 |---|---|
-| `/` và non-API path | Frontend |
-| `/api/v1/users...` | User Service |
-| `/api/v1/products...` | Catalog Service |
-| `/api/v1/orders...` | Order Service |
-| `/health` | Health dashboard do API Gateway phục vụ |
-| `/health/{service}` | Health của từng component qua API Gateway |
+| Runtime repositories | Application source, unit tests, Dockerfile, pipeline variables, stages, jobs, and steps |
+| `api-gateway` | Runtime routing, health aggregation, request IDs, and upstream limits |
+| `config-management` / GitHub `devops` | Compose, Helm, the minimal pipeline contract, E2E, scripts, and API contract |
 
-API contract đầy đủ nằm tại [docs/api-contract.md](docs/api-contract.md).
-
-## CI/CD ownership
-
-Mỗi runtime repository sở hữu source, unit test, Dockerfile và một
-`azure-pipelines.yml` ngắn. Năm file đó cùng extend:
-
-```text
-devops/pipelines/templates/service-pipeline.yml
-```
-
-Shared flow:
-
-```text
-Any branch: Test + Docker build + Trivy scan
-main:       Push ACR -> Deploy DEV -> Health/Smoke -> Approval -> Deploy PROD
-```
-
-`pipelines/system-e2e.yml` checkout cả sáu repository, build năm image bằng
-Compose rồi tạo order xuyên suốt qua public gateway. Chi tiết cấu hình Azure
-DevOps nằm trong [pipelines/README.md](pipelines/README.md).
-
-## AKS deployment
-
-Compose chỉ dành cho local development và integration CI. DEV/PROD trên AKS dùng
-năm Helm chart trong `deploy/helm`:
-
-```powershell
-helm lint ./deploy/helm/frontend
-helm lint ./deploy/helm/user-service
-helm lint ./deploy/helm/catalog-service
-helm lint ./deploy/helm/order-service
-helm lint ./deploy/helm/api-gateway
-```
-
-Namespace đề xuất là `dev` và `prod`. Chỉ Service của `api-gateway` có type
-`LoadBalancer`; các application upstream dùng `ClusterIP`.
-
-## Repository responsibilities
-
-| Nơi sở hữu | Nội dung |
-|---|---|
-| Runtime repo | Source, unit test, Dockerfile, pipeline entrypoint |
-| `api-gateway` | Routing runtime, health aggregation, request ID, upstream timeout |
-| `devops` | Shared pipeline, Compose, Helm, E2E, scripts và API contract |
-
-Không đặt application source hoặc logic routing trong `devops`. Không đặt Helm,
-Compose hay shared pipeline template trong runtime repos.
+Keep application logic out of this repository. Keep shared deployment
+configuration out of the runtime repositories.
