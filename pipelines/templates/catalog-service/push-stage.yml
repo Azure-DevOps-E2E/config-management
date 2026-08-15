@@ -1,0 +1,26 @@
+parameters:
+- name: containerRegistry
+  type: string
+
+stages:
+- stage: Push
+  displayName: 'Push Image to Azure Container Registry'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: DockerPush
+    displayName: 'Push Docker Image'
+    steps:
+    - checkout: self
+      displayName: 'Checkout source code'
+
+    - task: Docker@2
+      displayName: 'Login and Push to ACR'
+      inputs:
+        command: 'buildAndPush'
+        containerRegistry: ${{ parameters.containerRegistry }}
+        repository: '$(imageName)'
+        dockerfile: '$(dockerfilePath)'
+        tags: |
+          $(Build.BuildId)
+          latest
