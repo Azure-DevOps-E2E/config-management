@@ -1,0 +1,12 @@
+parameters:
+- name: qualitySteps
+  type: stepList
+  default: []
+
+steps:
+- checkout: self
+  clean: true
+  displayName: 'Checkout source code'
+
+- ${{ each qualityStep in parameters.qualitySteps }}:
+  - ${{ qualityStep }}

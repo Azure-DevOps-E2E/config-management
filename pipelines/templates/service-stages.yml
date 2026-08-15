@@ -1,0 +1,30 @@
+parameters:
+- name: serviceName
+  type: string
+- name: imageName
+  type: string
+- name: dockerfilePath
+  type: string
+  default: Dockerfile
+- name: buildContext
+  type: string
+  default: '$(Build.SourcesDirectory)'
+- name: containerRegistry
+  type: string
+- name: qualitySteps
+  type: stepList
+  default: []
+
+stages:
+- template: stages/quality.yml
+  parameters:
+    serviceName: ${{ parameters.serviceName }}
+    qualitySteps: ${{ parameters.qualitySteps }}
+
+- template: stages/container.yml
+  parameters:
+    serviceName: ${{ parameters.serviceName }}
+    imageName: ${{ parameters.imageName }}
+    dockerfilePath: ${{ parameters.dockerfilePath }}
+    buildContext: ${{ parameters.buildContext }}
+    containerRegistry: ${{ parameters.containerRegistry }}

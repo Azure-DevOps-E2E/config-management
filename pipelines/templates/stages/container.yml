@@ -1,0 +1,27 @@
+parameters:
+- name: serviceName
+  type: string
+- name: imageName
+  type: string
+- name: dockerfilePath
+  type: string
+- name: buildContext
+  type: string
+- name: containerRegistry
+  type: string
+
+stages:
+- stage: Container
+  displayName: 'Container - ${{ parameters.serviceName }}'
+  dependsOn: CI
+  condition: succeeded()
+  jobs:
+  - job: Container
+    displayName: 'Build, scan, and push ${{ parameters.serviceName }}'
+    steps:
+    - template: ../steps/container.yml
+      parameters:
+        imageName: ${{ parameters.imageName }}
+        dockerfilePath: ${{ parameters.dockerfilePath }}
+        buildContext: ${{ parameters.buildContext }}
+        containerRegistry: ${{ parameters.containerRegistry }}

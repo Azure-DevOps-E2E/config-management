@@ -1,0 +1,54 @@
+parameters:
+- name: imageName
+  type: string
+- name: dockerfilePath
+  type: string
+- name: buildContext
+  type: string
+- name: containerRegistry
+  type: string
+
+steps:
+- checkout: self
+  clean: true
+  displayName: 'Checkout source code'
+
+- task: Docker@2
+  displayName: 'Build Docker image'
+  inputs:
+    command: build
+    containerRegistry: ${{ parameters.containerRegistry }}
+    repository: ${{ parameters.imageName }}
+    dockerfile: ${{ parameters.dockerfilePath }}
+    buildContext: ${{ parameters.buildContext }}
+    tags: |
+      $(Build.BuildId)
+      latest
+    arguments: '--tag ${{ parameters.imageName }}:scan-$(Build.BuildId)'
+
+- bash: |
+    set -euo pipefail
+    mkdir -p "$(Pipeline.Workspace)/.trivy-cache"
+    docker run --rm \
+      --volume /var/run/docker.sock:/var/run/docker.sock \
+      --volume "$(Pipeline.Workspace)/.trivy-cache:/root/.cache/" \
+      aquasec/trivy:0.72.0 \
+      image \
+      --exit-code 1 \
+      --ignore-unfixed \
+      --severity HIGH,CRITICAL \
+      "$SCAN_IMAGE"
+  displayName: 'Scan Docker image with Trivy'
+  env:
+    SCAN_IMAGE: '${{ parameters.imageName }}:scan-$(Build.BuildId)'
+
+- task: Docker@2
+  displayName: 'Push Docker image to ACR'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  inputs:
+    command: push
+    containerRegistry: ${{ parameters.containerRegistry }}
+    repository: ${{ parameters.imageName }}
+    tags: |
+      $(Build.BuildId)
+      latest

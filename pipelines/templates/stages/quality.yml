@@ -1,0 +1,17 @@
+parameters:
+- name: serviceName
+  type: string
+- name: qualitySteps
+  type: stepList
+  default: []
+
+stages:
+- stage: CI
+  displayName: 'CI - ${{ parameters.serviceName }}'
+  jobs:
+  - job: Quality
+    displayName: 'Lint, test, and build ${{ parameters.serviceName }}'
+    steps:
+    - template: ../steps/quality.yml
+      parameters:
+        qualitySteps: ${{ parameters.qualitySteps }}
