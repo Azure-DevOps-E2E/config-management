@@ -1,0 +1,15 @@
+parameters:
+- name: compileTargets
+  type: string
+  default: app tests
+- name: workingDirectory
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+steps:
+- bash: |
+    set -euo pipefail
+    python -m ruff check .
+    python -m compileall -q ${{ parameters.compileTargets }}
+  displayName: 'Lint and compile Python sources'
+  workingDirectory: ${{ parameters.workingDirectory }}

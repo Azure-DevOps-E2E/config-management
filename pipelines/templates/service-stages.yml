@@ -3,6 +3,9 @@ parameters:
   type: string
 - name: imageName
   type: string
+- name: qualitySteps
+  type: stepList
+  default: []
 - name: dockerfilePath
   type: string
   default: Dockerfile
@@ -11,9 +14,6 @@ parameters:
   default: '$(Build.SourcesDirectory)'
 - name: containerRegistry
   type: string
-- name: qualitySteps
-  type: stepList
-  default: []
 
 stages:
 - template: stages/quality.yml

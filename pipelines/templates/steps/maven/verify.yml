@@ -1,0 +1,12 @@
+parameters:
+- name: workingDirectory
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+steps:
+- bash: |
+    set -euo pipefail
+    chmod +x mvnw
+    ./mvnw --batch-mode --no-transfer-progress verify
+  displayName: 'Test and build with Maven'
+  workingDirectory: ${{ parameters.workingDirectory }}

@@ -1,0 +1,10 @@
+parameters:
+- name: versionSpec
+  type: string
+  default: '24.x'
+
+steps:
+- task: NodeTool@0
+  displayName: 'Use Node.js ${{ parameters.versionSpec }}'
+  inputs:
+    versionSpec: ${{ parameters.versionSpec }}

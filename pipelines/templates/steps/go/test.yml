@@ -1,0 +1,46 @@
+parameters:
+- name: workingDirectory
+  type: string
+  default: '$(Build.SourcesDirectory)'
+- name: toolsDirectory
+  type: string
+  default: '$(Agent.TempDirectory)/go-tools/bin'
+- name: testResultsFile
+  type: string
+  default: reports/test-results.xml
+- name: coverageProfile
+  type: string
+  default: coverage.out
+- name: coverageReportFile
+  type: string
+  default: coverage/cobertura-coverage.xml
+- name: gotestsumVersion
+  type: string
+  default: v1.13.0
+- name: gocoverCoberturaVersion
+  type: string
+  default: v1.5.0
+
+steps:
+- bash: |
+    set -euo pipefail
+    tools_dir='${{ parameters.toolsDirectory }}'
+    mkdir -p "$tools_dir" "$(dirname '${{ parameters.testResultsFile }}')" "$(dirname '${{ parameters.coverageReportFile }}')"
+    GOBIN="$tools_dir" go install gotest.tools/gotestsum@${{ parameters.gotestsumVersion }}
+    GOBIN="$tools_dir" go install github.com/boumenot/gocover-cobertura@${{ parameters.gocoverCoberturaVersion }}
+
+    test_exit=0
+    "$tools_dir/gotestsum" \
+      --junitfile '${{ parameters.testResultsFile }}' \
+      -- \
+      -coverprofile='${{ parameters.coverageProfile }}' \
+      -covermode=atomic \
+      ./... || test_exit=$?
+
+    if [ -s '${{ parameters.coverageProfile }}' ]; then
+      "$tools_dir/gocover-cobertura" < '${{ parameters.coverageProfile }}' > '${{ parameters.coverageReportFile }}'
+    fi
+
+    exit "$test_exit"
+  displayName: 'Run Go tests with coverage'
+  workingDirectory: ${{ parameters.workingDirectory }}

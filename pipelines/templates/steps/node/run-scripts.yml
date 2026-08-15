@@ -1,0 +1,13 @@
+parameters:
+- name: scripts
+  type: object
+  default: []
+- name: workingDirectory
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+steps:
+- ${{ each scriptName in parameters.scripts }}:
+  - bash: npm run ${{ scriptName }}
+    displayName: 'Run npm script - ${{ scriptName }}'
+    workingDirectory: ${{ parameters.workingDirectory }}

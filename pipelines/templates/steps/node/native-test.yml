@@ -1,0 +1,25 @@
+parameters:
+- name: workingDirectory
+  type: string
+  default: '$(Build.SourcesDirectory)'
+- name: testResultsFile
+  type: string
+  default: reports/test-results.xml
+- name: coverageFile
+  type: string
+  default: coverage/lcov.info
+
+steps:
+- bash: |
+    set -euo pipefail
+    mkdir -p "$(dirname '${{ parameters.testResultsFile }}')" "$(dirname '${{ parameters.coverageFile }}')"
+    node --test \
+      --experimental-test-coverage \
+      --test-reporter=spec \
+      --test-reporter=junit \
+      --test-reporter=lcov \
+      --test-reporter-destination=stdout \
+      --test-reporter-destination='${{ parameters.testResultsFile }}' \
+      --test-reporter-destination='${{ parameters.coverageFile }}'
+  displayName: 'Run Node.js tests with coverage'
+  workingDirectory: ${{ parameters.workingDirectory }}

@@ -9,9 +9,10 @@ parameters:
   type: string
 
 steps:
-- checkout: self
-  clean: true
-  displayName: 'Checkout source code'
+- template: checkout.yml
+  parameters:
+    fetchDepth: 1
+    persistCredentials: false
 
 - task: Docker@2
   displayName: 'Build Docker image'

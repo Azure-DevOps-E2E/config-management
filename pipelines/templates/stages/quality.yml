@@ -9,9 +9,7 @@ stages:
 - stage: CI
   displayName: 'CI - ${{ parameters.serviceName }}'
   jobs:
-  - job: Quality
-    displayName: 'Lint, test, and build ${{ parameters.serviceName }}'
-    steps:
-    - template: ../steps/quality.yml
-      parameters:
-        qualitySteps: ${{ parameters.qualitySteps }}
+  - template: ../jobs/quality.yml
+    parameters:
+      serviceName: ${{ parameters.serviceName }}
+      qualitySteps: ${{ parameters.qualitySteps }}

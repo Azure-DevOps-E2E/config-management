@@ -1,0 +1,17 @@
+parameters:
+- name: clean
+  type: boolean
+  default: true
+- name: fetchDepth
+  type: number
+  default: 0
+- name: persistCredentials
+  type: boolean
+  default: true
+
+steps:
+- checkout: self
+  clean: ${{ parameters.clean }}
+  fetchDepth: ${{ parameters.fetchDepth }}
+  persistCredentials: ${{ parameters.persistCredentials }}
+  displayName: 'Checkout source code'

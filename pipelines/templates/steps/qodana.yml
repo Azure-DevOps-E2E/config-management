@@ -1,0 +1,33 @@
+parameters:
+- name: linter
+  type: string
+  default: ''
+- name: requiresToken
+  type: boolean
+  default: false
+
+steps:
+- ${{ if ne(parameters.linter, '') }}:
+  - task: Cache@2
+    displayName: 'Restore Qodana cache'
+    condition: succeededOrFailed()
+    inputs:
+      key: '"qodana" | "$(Agent.OS)" | "$(Build.Repository.Name)" | "$(Build.SourceBranchName)"'
+      restoreKeys: |
+        "qodana" | "$(Agent.OS)" | "$(Build.Repository.Name)"
+        "qodana" | "$(Agent.OS)"
+      path: '$(Agent.TempDirectory)/qodana/cache'
+
+  - task: QodanaScan@2026
+    displayName: 'Run Qodana'
+    condition: succeededOrFailed()
+    inputs:
+      args: '--linter ${{ parameters.linter }}'
+      uploadResult: false
+      uploadSarif: false
+      prMode: false
+      postPrComment: false
+      pushFixes: none
+    ${{ if eq(parameters.requiresToken, true) }}:
+      env:
+        QODANA_TOKEN: $(QODANA_TOKEN)

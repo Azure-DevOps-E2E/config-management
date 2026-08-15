@@ -1,0 +1,25 @@
+parameters:
+- name: coverageSource
+  type: string
+  default: app
+- name: testResultsFile
+  type: string
+  default: reports/test-results.xml
+- name: coverageReportFile
+  type: string
+  default: coverage/cobertura-coverage.xml
+- name: workingDirectory
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+steps:
+- bash: |
+    set -euo pipefail
+    mkdir -p "$(dirname '${{ parameters.testResultsFile }}')" "$(dirname '${{ parameters.coverageReportFile }}')"
+    python -m pytest \
+      --junitxml='${{ parameters.testResultsFile }}' \
+      --cov='${{ parameters.coverageSource }}' \
+      --cov-report=term-missing \
+      --cov-report=xml:'${{ parameters.coverageReportFile }}'
+  displayName: 'Run Pytest with coverage'
+  workingDirectory: ${{ parameters.workingDirectory }}

@@ -1,0 +1,40 @@
+parameters:
+- name: serviceName
+  type: string
+  default: '$(Build.Repository.Name)'
+- name: testResultsFormat
+  type: string
+  default: JUnit
+- name: testResultsFiles
+  type: string
+  default: '$(System.DefaultWorkingDirectory)/reports/test-results.xml'
+- name: coverageSummaryFile
+  type: string
+  default: '$(System.DefaultWorkingDirectory)/coverage/cobertura-coverage.xml'
+- name: coveragePathToSources
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+steps:
+- ${{ if ne(parameters.testResultsFiles, '') }}:
+  - task: PublishTestResults@2
+    displayName: 'Publish test report'
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: ${{ parameters.testResultsFormat }}
+      testResultsFiles: '${{ parameters.testResultsFiles }}'
+      searchFolder: '$(System.DefaultWorkingDirectory)'
+      mergeTestResults: true
+      failTaskOnFailedTests: true
+      failTaskOnFailureToPublishResults: true
+      failTaskOnMissingResultsFile: true
+      testRunTitle: '${{ parameters.serviceName }} tests'
+
+- ${{ if ne(parameters.coverageSummaryFile, '') }}:
+  - task: PublishCodeCoverageResults@2
+    displayName: 'Publish coverage report'
+    condition: succeededOrFailed()
+    inputs:
+      summaryFileLocation: '${{ parameters.coverageSummaryFile }}'
+      pathToSources: '${{ parameters.coveragePathToSources }}'
+      failIfCoverageEmpty: true

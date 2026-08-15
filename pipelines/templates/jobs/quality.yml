@@ -1,0 +1,11 @@
+parameters:
+- name: serviceName
+  type: string
+- name: qualitySteps
+  type: stepList
+  default: []
+
+jobs:
+- job: Quality
+  displayName: 'Lint, test, and build ${{ parameters.serviceName }}'
+  steps: ${{ parameters.qualitySteps }}

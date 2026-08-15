@@ -1,0 +1,12 @@
+parameters:
+- name: versionSpec
+  type: string
+  default: '21'
+
+steps:
+- task: JavaToolInstaller@0
+  displayName: 'Use Java ${{ parameters.versionSpec }}'
+  inputs:
+    versionSpec: ${{ parameters.versionSpec }}
+    jdkArchitectureOption: x64
+    jdkSourceOption: PreInstalled

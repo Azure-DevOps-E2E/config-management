@@ -1,0 +1,9 @@
+parameters:
+- name: workingDirectory
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+steps:
+- bash: npm ci
+  displayName: 'Install Node.js dependencies'
+  workingDirectory: ${{ parameters.workingDirectory }}

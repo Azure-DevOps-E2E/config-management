@@ -2,7 +2,7 @@
 
 This repository owns the configuration used to integrate, verify, and deploy
 the NexusCart system. It contains local Docker Compose orchestration, Helm
-charts for AKS, the shared Azure Pipeline contract, operational scripts, and
+charts for AKS, reusable Azure Pipeline templates, operational scripts, and
 the shared API contract.
 
 Application source remains in the five sibling runtime repositories.
@@ -12,7 +12,7 @@ Application source remains in the five sibling runtime repositories.
 - Full-stack Docker Compose environment for local development and E2E testing.
 - One Helm chart per deployable component.
 - DEV and PROD resource overrides for AKS.
-- Minimal Azure Pipeline contract with repository-owned stages, jobs, and steps.
+- Centralized Azure Pipeline stage, job, and composable step templates.
 - Cross-repository system E2E pipeline.
 - Health, readiness-wait, and order smoke-test scripts.
 - Central API contract for users, products, orders, errors, and health.
@@ -153,42 +153,30 @@ Verify one deployed service reports the expected immutable version:
 
 ## 🔁 CI/CD Flow
 
-Each runtime repository owns its pipeline variables and composes three local
-stage templates:
-
-```text
-pipelines/stages/ci.yml
-pipelines/stages/deploy-dev.yml
-pipelines/stages/deploy-prod.yml
-```
-
-Its root `azure-pipelines.yml` passes those stages to the minimal shared
-contract at `devops/pipelines/templates/pipeline-contract.yml`. The contract
-only accepts and renders a `stageList`; it does not own repository-specific
-variables, stages, jobs, or steps.
+Each runtime repository keeps a small `azure-pipelines.yml` entry point. It
+calls the shared stage/job templates and passes a typed `stepList` composed of
+reusable checkout, runtime setup, dependency install, test, report, build, and
+Qodana step templates.
 
 ```mermaid
 flowchart LR
-    C[Commit or PR] --> T[Test]
-    C --> B[Build image]
-    C --> S[Trivy scan]
-    T --> M{main?}
-    B --> M
-    S --> M
+    C[Commit or PR] --> Q[Composable quality steps]
+    Q --> T[Test and coverage reports]
+    Q --> D[Qodana]
+    T --> B[Build image]
+    D --> B
+    B --> S[Trivy scan]
+    S --> M{main?}
     M -->|No| E[End]
     M -->|Yes| A[Push to ACR]
-    A --> D[Deploy DEV]
-    D --> V[Health and smoke]
-    V --> P[Manual approval]
-    P --> R[Deploy PROD]
 ```
 
 The separate `pipelines/system-e2e.yml` pipeline checks out all six
 repositories, starts the Compose stack, validates health and ordering behavior,
 and publishes Compose diagnostics if the test fails.
 
-See [pipelines/README.md](pipelines/README.md) for Azure DevOps setup, required
-variables, image tagging, pipeline creation, and bootstrap deployment.
+See [pipelines/README.md](pipelines/README.md) for template composition, Azure
+DevOps setup, Qodana requirements, image tagging, and pipeline creation.
 
 ## ☸️ Helm and AKS
 
@@ -242,8 +230,10 @@ config-management/
 │   └── api-contract.md
 ├── pipelines/
 │   ├── stages/e2e.yml
-│   ├── templates/pipeline-contract.yml
-│   ├── templates/service-pipeline.yml    # Legacy rollback template
+│   ├── templates/stages/
+│   ├── templates/jobs/
+│   ├── templates/steps/
+│   ├── templates/service-stages.yml
 │   ├── system-e2e.yml
 │   └── README.md
 ├── scripts/

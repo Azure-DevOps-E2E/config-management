@@ -1,0 +1,10 @@
+parameters:
+- name: versionSpec
+  type: string
+  default: '3.13'
+
+steps:
+- task: UsePythonVersion@0
+  displayName: 'Use Python ${{ parameters.versionSpec }}'
+  inputs:
+    versionSpec: ${{ parameters.versionSpec }}

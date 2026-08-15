@@ -1,17 +1,16 @@
 # NexusCart Azure Pipelines
 
-NexusCart uses a minimal shared Azure Pipeline contract for the five runtime
+NexusCart uses centralized Azure Pipeline templates for the five runtime
 repositories and one cross-repository pipeline for full-stack E2E validation.
-Each runtime repository owns its variables, stages, jobs, and steps.
+Runtime repositories contain only small entry points and compose reusable
+quality steps.
 
 ## ✨ Highlights
 
-- One shared contract with repository-owned stage implementations.
-- Per-service tests, Docker builds, and Trivy vulnerability scans.
+- Shared stage, job, step, reporting, Qodana, Docker, and Trivy templates.
+- JUnit test and code coverage reports for every service.
 - Immutable Azure Container Registry tags based on `$(Build.BuildId)`.
-- The exact tested image is packaged as a pipeline artifact before publishing.
-- Automated Helm deployment and integrated verification in DEV.
-- Manual production approval followed by PROD deployment and health checks.
+- Qodana analysis selected through reusable technology-specific steps.
 - Cross-repository Docker Compose E2E coverage.
 - Automatic Compose diagnostics on E2E failure.
 
@@ -19,125 +18,99 @@ Each runtime repository owns its variables, stages, jobs, and steps.
 
 | Azure Pipeline | YAML source | Purpose |
 |---|---|---|
-| `frontend` | `frontend/azure-pipelines.yml` | Frontend test, image, and deployment |
-| `user-service` | `user-service/azure-pipelines.yml` | Go service test, image, and deployment |
-| `catalog-service` | `catalog-service/azure-pipelines.yml` | Python service test, image, and deployment |
-| `order-service` | `order-service/azure-pipelines.yml` | Java service test, image, and deployment |
-| `api-gateway` | `api-gateway/azure-pipelines.yml` | Gateway test, image, and deployment |
+| `frontend` | `frontend/azure-pipelines.yml` | Frontend quality and container pipeline |
+| `user-service` | `user-service/azure-pipelines.yml` | Go quality and container pipeline |
+| `catalog-service` | `catalog-service/azure-pipelines.yml` | Python quality and container pipeline |
+| `order-service` | `order-service/azure-pipelines.yml` | Java quality and container pipeline |
+| `api-gateway` | `api-gateway/azure-pipelines.yml` | Gateway quality and container pipeline |
 | `system-e2e` | `config-management/pipelines/system-e2e.yml` | Six-repository Compose and smoke validation |
 
 ## 🔁 Runtime Service Flow
 
 ```mermaid
 flowchart TD
-    A[Commit or PR] --> CI[CI]
-    CI --> T[Service tests]
-    CI --> B[Docker build]
-    CI --> S[Trivy scan]
-    T --> M{main branch?}
-    B --> M
-    S --> M
+    A[Commit or PR] --> Q[Composable quality steps]
+    Q --> T[Test and coverage]
+    Q --> R[Publish reports]
+    Q --> D[Qodana]
+    T --> C[Container stage]
+    R --> C
+    D --> C
+    C --> B[Docker build]
+    B --> S[Trivy scan]
+    S --> M{main branch?}
     M -->|No| E[End]
-    M -->|Yes| P[Push Build ID tag to ACR]
-    P --> DD[Helm deploy DEV]
-    DD --> VD[Wait, health, version, smoke]
-    VD --> AP[Manual approval]
-    AP --> DP[Helm deploy PROD]
-    DP --> VP[Wait, health, version]
+    M -->|Yes| P[Push Build ID and latest tags to ACR]
 ```
 
 ### Stage Behavior
 
 | Stage | Branches | Result |
 |---|---|---|
-| `CI` | All | Tests in one job; Docker build and Trivy scan in another |
-| `Push_ACR` | `main` | Loads the tested image artifact and pushes it to ACR |
-| `Deploy_DEV` | `main` | Atomic Helm upgrade in namespace `dev` |
-| `Verify_DEV` | `main` | Waits for all components, checks the deployed version, and runs smoke tests |
-| `Approval` | `main` | Manual validation before production |
-| `Deploy_PROD` | `main` | Atomic Helm upgrade in namespace `prod` |
-| `Verify_PROD` | `main` | Waits for all components and checks the deployed version |
+| `CI` | All | Test, coverage, report publication, build checks, and Qodana |
+| `Container` | All | Docker build and Trivy scan; ACR push only on `main` |
 
-## 🧩 Pipeline Contract and Repository-Owned Stages
+## 🧩 Composable Shared Templates
 
-The shared contract is:
+All reusable stage, job, and step implementations live in
+`config-management/pipelines/templates`:
 
 ```text
-pipelines/templates/pipeline-contract.yml
+templates/
+├── service-stages.yml
+├── stages/
+│   ├── quality.yml
+│   └── container.yml
+├── jobs/
+│   ├── quality.yml
+│   └── container.yml
+└── steps/
+    ├── checkout.yml
+    ├── reports.yml
+    ├── qodana.yml
+    ├── container.yml
+    ├── node/
+    ├── go/
+    ├── python/
+    └── maven/
 ```
 
-It defines only the compile-time `pipelineStages` interface required by Azure
-Pipelines and renders the supplied `stageList`. It does not define service
-variables, stage names, jobs, or steps. Those decisions stay in each runtime
-repository.
-
-Every runtime repository uses this layout:
-
-```text
-<service>/
-├── azure-pipelines.yml
-└── pipelines/
-    └── stages/
-        ├── ci.yml
-        ├── deploy-dev.yml
-        └── deploy-prod.yml
-```
-
-| Repository file | Owns |
-|---|---|
-| `azure-pipelines.yml` | Triggers, resources, variable groups, variables, and stage composition |
-| `pipelines/stages/ci.yml` | Service tests, Docker build, Trivy scan, artifact publication, and ACR push |
-| `pipelines/stages/deploy-dev.yml` | DEV deployment and verification stages, jobs, and steps |
-| `pipelines/stages/deploy-prod.yml` | Approval, PROD deployment, and verification stages, jobs, and steps |
-| `pipeline-contract.yml` | Only the shared `stageList` contract |
-
-Example runtime entry point:
+`service-stages.yml` accepts a typed `stepList` named `qualitySteps`. A service
+pipeline composes the exact building blocks it needs while keeping scripts and
+tasks centralized:
 
 ```yaml
-resources:
-  repositories:
-    - repository: pipelineTemplates
-      type: github
-      endpoint: github-azure-devops-e2e
-      name: Azure-DevOps-E2E/devops
-      ref: refs/heads/main
-
-variables:
-  - group: nexuscart-shared
-  - name: vmImage
-    value: ubuntu-latest
-  - name: serviceName
-    value: user-service
-  - name: imageRepository
-    value: user-service
-  - name: dockerfilePath
-    value: Dockerfile
-  - name: imageTag
-    value: $(Build.BuildId)
-  - name: fullImageName
-    value: $(acrLoginServer)/$(imageRepository):$(imageTag)
-
-extends:
-  template: pipelines/templates/pipeline-contract.yml@pipelineTemplates
+stages:
+- template: pipelines/templates/service-stages.yml@configTemplates
   parameters:
-    pipelineStages:
-      - template: pipelines/stages/ci.yml@self
-      - template: pipelines/stages/deploy-dev.yml@self
-      - template: pipelines/stages/deploy-prod.yml@self
+    serviceName: user-service
+    imageName: user-service
+    dockerfilePath: Dockerfile
+    containerRegistry: acrLoginServer
+    qualitySteps:
+    - template: pipelines/templates/steps/checkout.yml@configTemplates
+    - template: pipelines/templates/steps/go/setup.yml@configTemplates
+    - template: pipelines/templates/steps/go/test.yml@configTemplates
+    - template: pipelines/templates/steps/go/verify.yml@configTemplates
+    - template: pipelines/templates/steps/reports.yml@configTemplates
+    - template: pipelines/templates/steps/qodana.yml@configTemplates
+      parameters:
+        linter: qodana-go
+        requiresToken: true
 ```
 
-`pipelines/templates/service-pipeline.yml` is retained temporarily as a legacy
-rollback file. New and migrated pipelines must use `pipeline-contract.yml`.
+This keeps the service flow explicit while every implementation remains
+reusable by another repository.
 
-## ✅ Per-Service Quality Gates
+## ✅ Reusable Quality Steps
 
-| Service | CI test command |
+| Step family | Reusable templates |
 |---|---|
-| `frontend` | `npm ci`, type-check, Vitest, and production build |
-| `api-gateway` | `npm ci`, Node test runner, and syntax checks |
-| `user-service` | `go test ./...` |
-| `catalog-service` | Install development requirements and run Pytest |
-| `order-service` | `./mvnw test` |
+| Common | Checkout, test/coverage publication, and Qodana |
+| Node.js | Runtime setup, `npm ci`, Vitest, native test runner, and npm scripts |
+| Go | Runtime setup, Gotestsum/Cobertura test, vet, and build |
+| Python | Runtime setup, dependency install, Pytest/Cobertura, Ruff, and compile |
+| Maven | Java setup and Maven verify with Surefire/JaCoCo output |
 
 Every service image is also scanned with Trivy `0.72.0`. The scan ignores
 vulnerabilities without an available fix and fails on the remaining `HIGH` or
@@ -145,11 +118,10 @@ vulnerabilities without an available fix and fails on the remaining `HIGH` or
 
 ## 🏷️ Image Tagging Strategy
 
-| Environment | Tag | Purpose |
-|---|---|---|
-| CI | `$(Build.BuildId)` | Identifies the image built and scanned by one pipeline run |
-| DEV | Same Build ID | Proves DEV runs the tested image |
-| PROD | Same Build ID | Promotes the exact DEV-verified image |
+| Branch | Tags pushed to ACR |
+|---|---|
+| `main` | `$(Build.BuildId)` and `latest` |
+| Other branches and PRs | None; the image is built and scanned on the agent |
 
 The full image reference is:
 
@@ -157,7 +129,7 @@ The full image reference is:
 $(acrLoginServer)/<service>:$(Build.BuildId)
 ```
 
-No image is rebuilt between CI, DEV, and PROD.
+The image that passes Trivy is the image pushed on `main`.
 
 ## ⚙️ Required Azure DevOps Setup
 
@@ -166,57 +138,44 @@ No image is rebuilt between CI, DEV, and PROD.
 Create and authorize a GitHub service connection named:
 
 ```text
-github-azure-devops-e2e
+github.com_Azure-DevOps-E2E
 ```
 
 It must be able to read all six repositories in the `Azure-DevOps-E2E`
 organization.
 
-The shared configuration repository is referenced by its actual GitHub name,
-`Azure-DevOps-E2E/devops`, even when its local clone is named
-`config-management`.
+The shared repository is `Azure-DevOps-E2E/config-management`.
 
-### Variable Group
+### ACR Service Connection
 
-Create a variable group named `nexuscart-shared`:
+Create and authorize a Docker Registry service connection named
+`acrLoginServer`. The shared container template passes this literal service
+connection name to `Docker@2`.
 
-| Variable | Example or purpose |
-|---|---|
-| `acrLoginServer` | `example.azurecr.io` |
-| `acrServiceConnection` | Docker Registry service connection for ACR |
-| `azureServiceConnection` | Azure Resource Manager service connection |
-| `aksResourceGroup` | Resource group that contains AKS |
-| `aksClusterName` | Target AKS cluster |
-| `devBaseUrl` | Public API Gateway URL for DEV |
-| `prodBaseUrl` | Public API Gateway URL for PROD |
-| `prodApprovers` | Users or email addresses notified for approval |
+### Qodana
 
-Mark credentials as secrets where applicable. Authorize the variable group and
-all service connections for each pipeline.
+Install the Qodana Azure Pipelines extension in the Azure DevOps organization.
+Create a secret pipeline variable named `QODANA_TOKEN` for:
 
-### Environments
+- `frontend` and `api-gateway`, which use `qodana-js`.
+- `user-service`, which uses `qodana-go`.
 
-Create these Azure DevOps environments:
-
-- `nexuscart-dev`
-- `nexuscart-prod`
-
-The YAML already contains a manual validation stage. Add Azure DevOps Approval
-and checks to `nexuscart-prod` if an additional platform-level policy is
-required.
+Use the project-specific token generated for each Qodana Cloud project.
+`catalog-service` and `order-service` use Community linters and do not require
+a token.
 
 ### Required Template Enforcement
 
 After one runtime pipeline has been validated successfully, open the
-`github-azure-devops-e2e` service connection, select `Approvals and checks`,
+`github.com_Azure-DevOps-E2E` service connection, select `Approvals and checks`,
 and add a `Required template` check with:
 
 | Field | Value |
 |---|---|
 | Repository type | `GitHub` |
-| Repository | `Azure-DevOps-E2E/devops` |
+| Repository | `Azure-DevOps-E2E/config-management` |
 | Ref | `refs/heads/main` |
-| Path to required template | `pipelines/templates/pipeline-contract.yml` |
+| Path to required template | `pipelines/templates/service-stages.yml` |
 
 Keep the check disabled during the pilot so a configuration mistake does not
 block all services at once.
@@ -233,21 +192,21 @@ separate policy that performs that enforcement.
    `order-service`, and `api-gateway`.
 3. Create `system-e2e` from
    `config-management/pipelines/system-e2e.yml`.
-4. Authorize repository resources, the variable group, and service
-   connections on the first run.
+4. Authorize the shared GitHub repository and `acrLoginServer` service
+   connection on the first run.
 
 The exact runtime pipeline names matter because `system-e2e` references them
 as pipeline resources.
 
 ### Safe Rollout Order
 
-1. Push the `devops` repository first so `pipeline-contract.yml`, Helm charts,
-   and scripts exist on `main` before runtime pipelines compile.
+1. Push `config-management` first so all referenced stage, job, and step
+   templates exist on `main` before runtime pipelines compile.
 2. Push and preview one pilot runtime pipeline, preferably `user-service`.
 3. Migrate the remaining runtime repositories after the pilot is green.
 4. Push the refactored `system-e2e` pipeline.
-5. Enable the `Required template` check only after all target pipelines are
-   using the contract.
+5. Enable the `Required template` check only after all target pipelines include
+   `service-stages.yml`.
 
 ## 🧪 System E2E Pipeline
 
@@ -274,13 +233,13 @@ triggered after the `CI` stage succeeds on `main` for any runtime pipeline.
 On failure, it publishes `docker compose ps --all` and service logs in the
 `compose-diagnostics` artifact.
 
-## 🚢 First Deployment Bootstrap
+## 🚢 Deployment Scope
 
-A service pipeline deploys one release and then verifies the complete system.
-The first environment therefore needs all five images in ACR and all five Helm
-releases.
+Runtime service pipelines stop after the tested image is pushed to ACR. Helm
+charts remain in `config-management`, but deployment is intentionally separate
+from these CI pipelines.
 
-Install the initial releases in dependency order:
+For a manual DEV bootstrap, install releases in dependency order:
 
 ```bash
 helm upgrade --install user-service deploy/helm/user-service -n dev --create-namespace -f deploy/helm/user-service/values-dev.yaml
@@ -291,8 +250,7 @@ helm upgrade --install api-gateway deploy/helm/api-gateway -n dev -f deploy/helm
 ```
 
 For each command, override `image.repository`, `image.tag`, and `appVersion`
-with real ACR values. After bootstrap, each service pipeline manages its own
-release.
+with real ACR values.
 
 ## 🔍 Local Validation
 

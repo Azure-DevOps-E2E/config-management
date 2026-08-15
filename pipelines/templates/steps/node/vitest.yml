@@ -1,0 +1,28 @@
+parameters:
+- name: workingDirectory
+  type: string
+  default: '$(Build.SourcesDirectory)'
+- name: testScript
+  type: string
+  default: test:run
+- name: testResultsFile
+  type: string
+  default: reports/test-results.xml
+- name: coverageDirectory
+  type: string
+  default: coverage
+
+steps:
+- bash: |
+    set -euo pipefail
+    mkdir -p "$(dirname '${{ parameters.testResultsFile }}')" '${{ parameters.coverageDirectory }}'
+    npm run ${{ parameters.testScript }} -- \
+      --reporter=default \
+      --reporter=junit \
+      --outputFile.junit='${{ parameters.testResultsFile }}' \
+      --coverage \
+      --coverage.reporter=text \
+      --coverage.reporter=cobertura \
+      --coverage.reportsDirectory='${{ parameters.coverageDirectory }}'
+  displayName: 'Run Vitest with coverage'
+  workingDirectory: ${{ parameters.workingDirectory }}

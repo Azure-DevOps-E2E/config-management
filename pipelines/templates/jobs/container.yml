@@ -10,15 +10,12 @@ parameters:
 - name: containerRegistry
   type: string
 
-stages:
-- stage: Container
-  displayName: 'Container - ${{ parameters.serviceName }}'
-  dependsOn: CI
-  condition: succeeded()
-  jobs:
-  - template: ../jobs/container.yml
+jobs:
+- job: Container
+  displayName: 'Build, scan, and push ${{ parameters.serviceName }}'
+  steps:
+  - template: ../steps/container.yml
     parameters:
-      serviceName: ${{ parameters.serviceName }}
       imageName: ${{ parameters.imageName }}
       dockerfilePath: ${{ parameters.dockerfilePath }}
       buildContext: ${{ parameters.buildContext }}
