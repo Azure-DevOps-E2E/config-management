@@ -1,0 +1,29 @@
+parameters:
+- name: scanImage
+  type: string
+- name: trivyVersion
+  type: string
+  default: '0.72.0'
+- name: cacheDirectory
+  type: string
+  default: '$(Pipeline.Workspace)/.trivy-cache'
+- name: severity
+  type: string
+  default: HIGH,CRITICAL
+
+steps:
+- bash: |
+    set -euo pipefail
+    mkdir -p '${{ parameters.cacheDirectory }}'
+    docker run --rm \
+      --volume /var/run/docker.sock:/var/run/docker.sock \
+      --volume '${{ parameters.cacheDirectory }}:/root/.cache/' \
+      'aquasec/trivy:${{ parameters.trivyVersion }}' \
+      image \
+      --exit-code 1 \
+      --ignore-unfixed \
+      --severity '${{ parameters.severity }}' \
+      "$SCAN_IMAGE"
+  displayName: 'Scan Docker image with Trivy'
+  env:
+    SCAN_IMAGE: '${{ parameters.scanImage }}'
