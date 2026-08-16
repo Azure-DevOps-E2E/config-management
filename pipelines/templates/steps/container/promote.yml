@@ -1,0 +1,55 @@
+parameters:
+- name: registry
+  type: string
+- name: repository
+  type: string
+- name: candidateTag
+  type: string
+- name: releaseTag
+  type: string
+
+steps:
+- bash: |
+    set -euo pipefail
+
+    registry="${REGISTRY%/}"
+    source_image="$registry/$REPOSITORY:$CANDIDATE_TAG"
+    release_image="$registry/$REPOSITORY:$RELEASE_TAG"
+    prod_image="$registry/$REPOSITORY:prod"
+
+    echo "Pulling immutable DEV candidate $source_image"
+    docker pull "$source_image"
+    source_digest="$(docker image inspect --format='{{index .RepoDigests 0}}' "$source_image" | cut -d@ -f2)"
+
+    if [ -z "$source_digest" ]; then
+      echo "Unable to resolve the candidate image digest."
+      exit 1
+    fi
+
+    docker tag "$source_image" "$release_image"
+    docker tag "$source_image" "$prod_image"
+    docker push "$release_image"
+    docker push "$prod_image"
+
+    docker pull "$release_image" >/dev/null
+    docker pull "$prod_image" >/dev/null
+    release_digest="$(docker image inspect --format='{{index .RepoDigests 0}}' "$release_image" | cut -d@ -f2)"
+    prod_digest="$(docker image inspect --format='{{index .RepoDigests 0}}' "$prod_image" | cut -d@ -f2)"
+
+    if [ "$source_digest" != "$release_digest" ] || [ "$source_digest" != "$prod_digest" ]; then
+      echo "Promotion changed the image digest."
+      echo "candidate=$source_digest release=$release_digest prod=$prod_digest"
+      exit 1
+    fi
+
+    echo "Promoted $source_image to $release_image and $prod_image"
+    echo "Digest: $source_digest"
+    echo "##vso[task.setvariable variable=promotedImageDigest;isOutput=true]$source_digest"
+    echo "##vso[task.setvariable variable=promotedImageTag;isOutput=true]$RELEASE_TAG"
+  name: promoteImage
+  displayName: 'Promote candidate image without rebuild'
+  env:
+    REGISTRY: '${{ parameters.registry }}'
+    REPOSITORY: '${{ parameters.repository }}'
+    CANDIDATE_TAG: '${{ parameters.candidateTag }}'
+    RELEASE_TAG: '${{ parameters.releaseTag }}'

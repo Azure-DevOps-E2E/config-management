@@ -1,0 +1,54 @@
+parameters:
+- name: devBranch
+  type: string
+  default: dev
+
+steps:
+- bash: |
+    set -euo pipefail
+
+    current_commit="$BUILD_SOURCEVERSION"
+    dev_branch="$DEV_BRANCH"
+    dev_ref="refs/remotes/origin/$dev_branch"
+
+    set_outputs() {
+      local should_promote="$1"
+      local candidate_commit="${2:-}"
+      echo "##vso[task.setvariable variable=shouldPromote;isOutput=true]$should_promote"
+      echo "##vso[task.setvariable variable=candidateSourceVersion;isOutput=true]$candidate_commit"
+    }
+
+    if ! git fetch --no-tags origin "+refs/heads/$dev_branch:$dev_ref"; then
+      echo "Branch origin/$dev_branch does not exist. This main commit is not a DEV promotion."
+      set_outputs false
+      exit 0
+    fi
+
+    candidate_commit=''
+    promotion_mode=''
+
+    if git merge-base --is-ancestor "$current_commit" "$dev_ref"; then
+      candidate_commit="$current_commit"
+      promotion_mode='fast-forward'
+    else
+      second_parent="$(git rev-parse "$current_commit^2" 2>/dev/null || true)"
+      if [ -n "$second_parent" ] && git merge-base --is-ancestor "$second_parent" "$dev_ref"; then
+        candidate_commit="$second_parent"
+        promotion_mode='merge-commit'
+      fi
+    fi
+
+    if [ -z "$candidate_commit" ]; then
+      echo "Commit $current_commit is not a merge or fast-forward from origin/$dev_branch."
+      echo "Only CI will run for this direct main update."
+      set_outputs false
+      exit 0
+    fi
+
+    echo "Promotion source: $candidate_commit ($promotion_mode from origin/$dev_branch)"
+    set_outputs true "$candidate_commit"
+  name: resolveCandidate
+  displayName: 'Resolve DEV candidate commit'
+  env:
+    BUILD_SOURCEVERSION: '$(Build.SourceVersion)'
+    DEV_BRANCH: '${{ parameters.devBranch }}'
