@@ -10,12 +10,19 @@ required contract and reusable script implementations.
 | Git update | Stages that run | Result |
 |---|---|---|
 | Push to `feature/*` | `<service>-ci`: `CI` | Test, coverage, lint, and build validation only |
+| Open or update a PR targeting `dev` or `main` | `<service>-ci`: `CI` | Validate the GitHub PR merge commit; no image build or deployment |
 | Push or merge to `dev` | `<service>-dev`: `CI -> BuildCandidate -> DeployDev -> VerifyDev` | Build once, scan, push an immutable candidate, deploy and verify DEV |
 | Merge `dev` into `main` | `<service>-prod`: `CI -> ResolveCandidate -> PromoteImage -> DeployProd -> VerifyProd -> Release` | Promote the exact DEV image without rebuilding, deploy PROD, then create a Git tag and GitHub Release |
 | Direct push to `main` | `<service>-prod`: `CI -> ResolveCandidate` | CI runs, but production promotion is skipped because the commit did not come from `dev` |
 
-Pull-request validation is not enabled separately. A push to a `feature/*`
-branch already supplies the CI status without starting a duplicate PR run.
+Pull-request validation is enabled only in `azure-pipelines.yml` for target
+branches `dev` and `main`, with older runs automatically canceled when a PR
+receives a new commit. DEV and PROD pipeline entry points keep `pr: none`, so
+a pull request can never build an image or deploy an environment.
+
+Feature pushes still run branch CI. If a feature branch already has an open
+PR to `dev` or `main`, the same update can produce both the feature CI run and
+the PR validation run.
 
 Use a merge commit or a fast-forward when merging `dev` into `main`.
 Squash and rebase merges intentionally do not qualify as production
