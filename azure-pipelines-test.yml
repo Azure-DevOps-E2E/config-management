@@ -1,0 +1,14 @@
+trigger:
+  branches:
+    azure-pipeline-test
+pool:
+  name: azure-agent
+
+jobs:
+- job: Build_1
+  steps:
+  - script: echo "Running on agent 1"
+
+- job: Build_2
+  steps:
+  - script: echo "Running on agent 2"
