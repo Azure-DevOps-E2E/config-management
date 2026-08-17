@@ -12,7 +12,7 @@ required contract and reusable script implementations.
 | Push to `feature/*` | `<service>-ci`: `CI` | Test, coverage, lint, and build validation only |
 | Open or update a PR targeting `dev` or `main` | `<service>-ci`: `CI` | Validate the GitHub PR merge commit; no image build or deployment |
 | Push or merge to `dev` | `<service>-dev`: `CI -> BuildCandidate -> UpdateManifest` | Build once, scan, push an immutable candidate, then commit its tag to `values-dev.yaml` |
-| Merge `dev` into `main` | `<service>-prod`: `CI -> ResolveCandidate -> PromoteImage -> UpdateManifest -> Release` | Promote the exact DEV image without rebuilding, commit `values-prod.yaml`, then create a Git tag and GitHub Release |
+| Merge `dev` into `main` | `<service>-prod`: `CI -> ResolveCandidate -> ValidateReleaseTag -> PromoteImage -> UpdateManifest -> Release` | Require an existing release Git tag, promote the exact DEV image without rebuilding, commit `values-prod.yaml`, then create a GitHub Release |
 | Direct push to `main` | `<service>-prod`: `CI -> ResolveCandidate` | CI runs, but production promotion is skipped because the commit did not come from `dev` |
 
 Pull-request validation is enabled only in `azure-pipelines.yml` for target
@@ -117,20 +117,23 @@ start the separate `system-e2e` pipeline.
 
 ## Git tag and GitHub Release
 
-The PROD pipeline exposes a runtime `releaseTag` input before promotion. Use a
-strict semantic tag such as `v1.0.119`; the pipeline validates
-`v<major>.<minor>.<patch>` before retagging the candidate image.
+The PROD pipeline exposes a runtime `releaseTag` input before promotion. Use an
+existing strict semantic tag such as `v1.0.119`; the pipeline validates
+`v<major>.<minor>.<patch>` and checks that `refs/tags/<releaseTag>` already
+exists on origin before retagging the candidate image. If the tag is missing,
+the run stops before image promotion and the operator must create or choose an
+existing Git tag, then rerun the pipeline with that `releaseTag`.
 
 After the PROD manifest commit succeeds, the release job uses the persisted
 GitHub checkout credentials to:
 
-1. create the requested Git tag at the triggering `main` commit;
-2. push the tag to GitHub;
-3. create a GitHub Release through the GitHub API with the same tag;
-4. include the promoted image, digest, DEV candidate commit, and PROD commit.
+1. confirm the requested Git tag still exists on GitHub;
+2. create a GitHub Release through the GitHub API with the same tag;
+3. include the promoted image, digest, DEV candidate commit, and PROD commit.
 
-The tag and release are therefore not created when the Production approval,
-image promotion, or manifest update fails.
+The GitHub Release is therefore not created when tag validation, Production
+approval, image promotion, or manifest update fails. The pipeline does not
+create or push Git tags; release tags must exist before promotion.
 
 ## Required Azure DevOps configuration
 
@@ -153,7 +156,7 @@ Required service connections:
 
 | Name | Requirement |
 |---|---|
-| `github.com_Azure-DevOps-E2E` | Read/write `config-management` so manifest commits can be pushed; read/write runtime repositories so release tags and GitHub Releases can be created |
+| `github.com_Azure-DevOps-E2E` | Read/write `config-management` so manifest commits can be pushed; read runtime repository tags and create GitHub Releases |
 | `acrLoginServer` | Docker Registry connection with ACR pull and push permission |
 
 Use the existing environments `Development` and `Production` for the manifest
