@@ -1,17 +1,18 @@
 # NexusCart Azure Pipelines
 
-The five runtime repositories each own one readable Azure Pipeline. Every
-service file declares its trigger, variables, stages, jobs, and Azure-native
-tasks. Only reusable script implementations live in this repository.
+The five runtime repositories each own three branch-focused Azure Pipelines.
+Every YAML file declares its trigger, variables, stages, jobs, and Azure-native
+tasks. Active service pipelines use this repository only for the minimal
+required contract and reusable script implementations.
 
 ## Runtime pipeline flow
 
 | Git update | Stages that run | Result |
 |---|---|---|
-| Push to `feature/*` | `CI` | Test, coverage, lint, and build validation only |
-| Push or merge to `dev` | `CI -> BuildCandidate -> DeployDev -> VerifyDev` | Build once, scan, push an immutable candidate, deploy and verify DEV |
-| Merge `dev` into `main` | `CI -> ResolveCandidate -> PromoteImage -> DeployProd -> VerifyProd -> Release` | Promote the exact DEV image without rebuilding, deploy PROD, then create a Git tag and GitHub Release |
-| Direct push to `main` | `CI -> ResolveCandidate` | CI runs, but production promotion is skipped because the commit did not come from `dev` |
+| Push to `feature/*` | `<service>-ci`: `CI` | Test, coverage, lint, and build validation only |
+| Push or merge to `dev` | `<service>-dev`: `CI -> BuildCandidate -> DeployDev -> VerifyDev` | Build once, scan, push an immutable candidate, deploy and verify DEV |
+| Merge `dev` into `main` | `<service>-prod`: `CI -> ResolveCandidate -> PromoteImage -> DeployProd -> VerifyProd -> Release` | Promote the exact DEV image without rebuilding, deploy PROD, then create a Git tag and GitHub Release |
+| Direct push to `main` | `<service>-prod`: `CI -> ResolveCandidate` | CI runs, but production promotion is skipped because the commit did not come from `dev` |
 
 Pull-request validation is not enabled separately. A push to a `feature/*`
 branch already supplies the CI status without starting a duplicate PR run.
@@ -22,19 +23,18 @@ promotions because they cannot be mapped safely to an immutable DEV image.
 
 ## Pipeline ownership
 
-The entry point in every runtime repository keeps the complete operational
-shape visible:
+Every runtime repository keeps the operational shape visible in three entry
+points:
 
 ```text
-azure-pipelines.yml
-|-- resources.repositories (alias: templates)
-|-- variables
-`-- extends pipeline-contract.yml
-    `-- pipelineStages
-        |-- CI
-        |-- BuildCandidate / DeployDev / VerifyDev
-        `-- ResolveCandidate / PromoteImage / DeployProd / VerifyProd / Release
+azure-pipelines.yml       # feature/*: CI
+azure-pipelines-dev.yml   # dev: CI, candidate build, Development deploy/verify
+azure-pipelines-prod.yml  # main: CI, promote, Production deploy/verify, release
 ```
+
+Create three Azure Pipeline definitions for each service and point them to
+those files. Use the names `<service>-ci`, `<service>-dev`, and
+`<service>-prod`.
 
 Azure-native operations stay inline in each service pipeline, including
 checkout, runtime setup, report publication, Docker, Helm, PowerShell, and
@@ -91,8 +91,9 @@ fails.
 
 ## Required Azure DevOps configuration
 
-Create and authorize variable group `nexuscart-shared` for all five runtime
-pipelines:
+Create and authorize variable group `nexuscart-shared` for the DEV and PROD
+pipelines in all five runtime repositories. Feature CI deliberately does not
+load the deployment variable group:
 
 | Variable | Purpose |
 |---|---|
@@ -103,9 +104,9 @@ pipelines:
 | `devBaseUrl` | Public DEV gateway base URL |
 | `prodBaseUrl` | Public PROD gateway base URL |
 
-Each service pipeline independently declares its service name, image
-repository, runtime version, report paths, Dockerfile, Trivy version,
-candidate tag, release tag, chart path, and service connection aliases.
+Each YAML independently declares only the values it needs, including its
+service name, runtime version, report paths, image details, and service
+connection aliases.
 
 Required service connections:
 
@@ -140,13 +141,13 @@ external template.
 
 ## Pipeline inventory
 
-| Azure Pipeline | YAML source |
+| Azure Pipelines | YAML sources |
 |---|---|
-| `frontend` | `frontend/azure-pipelines.yml` |
-| `api-gateway` | `api-gateway/azure-pipelines.yml` |
-| `user-service` | `user-service/azure-pipelines.yml` |
-| `catalog-service` | `catalog-service/azure-pipelines.yml` |
-| `order-service` | `order-service/azure-pipelines.yml` |
+| `frontend-ci/dev/prod` | `frontend/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `api-gateway-ci/dev/prod` | `api-gateway/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `user-service-ci/dev/prod` | `user-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `catalog-service-ci/dev/prod` | `catalog-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `order-service-ci/dev/prod` | `order-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
 | `system-e2e` | `config-management/pipelines/system-e2e.yml` |
 
 Push `config-management` before a runtime repository so the referenced
