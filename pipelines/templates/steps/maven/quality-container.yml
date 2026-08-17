@@ -9,5 +9,9 @@ steps:
     displayName: 'Test and build with Maven in Docker'
     cacheKey: ${{ parameters.cacheKey }}
     command: |
+      echo '##[section]Java and Maven versions'
+      java -version
+      mvn --version
+      echo '##[section]Maven test and coverage'
+      echo '##[command]mvn --batch-mode --no-transfer-progress verify'
       mvn --batch-mode --no-transfer-progress verify
-

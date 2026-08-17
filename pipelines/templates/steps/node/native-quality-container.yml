@@ -15,8 +15,14 @@ steps:
     displayName: 'Check and test Node.js application in Docker'
     cacheKey: ${{ parameters.cacheKey }}
     command: |
+      echo '##[section]Node.js and npm versions'
+      node --version
+      npm --version
       mkdir -p reports coverage
+      echo '##[section]Install Node.js dependencies'
+      echo '##[command]npm ci'
       npm ci
+      echo '##[section]Node.js tests and coverage'
       node --test \
         --experimental-test-coverage \
         --test-reporter=spec \
@@ -25,5 +31,6 @@ steps:
         --test-reporter-destination=stdout \
         --test-reporter-destination='${{ parameters.testResultsFile }}' \
         --test-reporter-destination='${{ parameters.coverageFile }}'
+      echo '##[section]Node.js syntax validation'
+      echo '##[command]npm run check'
       npm run check
-

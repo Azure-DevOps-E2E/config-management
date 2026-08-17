@@ -28,8 +28,18 @@ steps:
         ;;
     esac
 
-    echo "Pulling CI image: $image"
+    echo '##[section]Docker engine'
+    echo '##[command]docker version'
+    docker version
+
+    echo "##[section]Pull CI image: $image"
+    echo "##[command]docker pull $image"
     docker pull "$image"
+
+    echo '##[section]Resolved CI image metadata'
+    docker image inspect \
+      --format 'Image={{index .RepoTags 0}} ID={{.Id}} Created={{.Created}}' \
+      "$image"
+
     echo "##vso[task.setvariable variable=resolvedBuildImage]$image"
   displayName: 'Resolve and pull CI image'
-

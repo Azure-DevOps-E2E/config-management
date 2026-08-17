@@ -15,8 +15,14 @@ steps:
     displayName: 'Lint and test Node.js application in Docker'
     cacheKey: ${{ parameters.cacheKey }}
     command: |
+      echo '##[section]Node.js and npm versions'
+      node --version
+      npm --version
       mkdir -p '${{ parameters.coverageDirectory }}' reports
+      echo '##[section]Install Node.js dependencies'
+      echo '##[command]npm ci'
       npm ci
+      echo '##[section]Vitest and coverage'
       npm run test:run -- \
         --reporter=default \
         --reporter=junit \
@@ -25,5 +31,6 @@ steps:
         --coverage.reporter=text \
         --coverage.reporter=cobertura \
         --coverage.reportsDirectory='${{ parameters.coverageDirectory }}'
+      echo '##[section]TypeScript validation'
+      echo '##[command]npm run typecheck'
       npm run typecheck
-

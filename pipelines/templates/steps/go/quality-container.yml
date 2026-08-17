@@ -24,11 +24,15 @@ steps:
     displayName: 'Vet and test Go application in Docker'
     cacheKey: ${{ parameters.cacheKey }}
     command: |
+      echo '##[section]Go runtime version'
+      go version
       tools_dir=/tmp/ci-home/bin
       mkdir -p "$tools_dir" reports coverage
+      echo '##[section]Install Go test and coverage tools'
       GOBIN="$tools_dir" go install gotest.tools/gotestsum@${{ parameters.gotestsumVersion }}
       GOBIN="$tools_dir" go install github.com/boumenot/gocover-cobertura@${{ parameters.gocoverCoberturaVersion }}
 
+      echo '##[section]Go tests and coverage'
       test_exit=0
       "$tools_dir/gotestsum" \
         --junitfile '${{ parameters.testResultsFile }}' \
@@ -45,4 +49,6 @@ steps:
         exit "$test_exit"
       fi
 
+      echo '##[section]Go vet'
+      echo '##[command]go vet ./...'
       go vet ./...

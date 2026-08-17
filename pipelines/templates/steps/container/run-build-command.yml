@@ -22,6 +22,10 @@ steps:
     ci_home="$(Pipeline.Workspace)/.ci-container-home/${{ parameters.cacheKey }}"
     mkdir -p "$ci_home"
 
+    echo "##[section]Start foreground CI container: $image"
+    echo "##[command]docker run --rm --workdir '${{ parameters.workingDirectory }}' $image"
+
+    set +e
     docker run --rm \
       --user "${UID}:${GROUPS[0]}" \
       --env CI=true \
@@ -32,7 +36,15 @@ steps:
       --entrypoint /bin/sh \
       "$image" \
       -ec "$BUILD_COMMAND"
+    container_status=$?
+    set -e
+
+    if [ "$container_status" -ne 0 ]; then
+      echo "##vso[task.logissue type=error]CI container $image exited with code $container_status"
+      exit "$container_status"
+    fi
+
+    echo "##[section]CI container completed successfully: $image"
   displayName: ${{ parameters.displayName }}
   env:
     BUILD_COMMAND: ${{ parameters.command }}
-
