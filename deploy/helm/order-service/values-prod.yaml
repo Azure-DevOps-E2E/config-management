@@ -8,3 +8,10 @@ resources:
   limits:
     cpu: 1000m
     memory: 1Gi
+
+# BEGIN AZURE PIPELINES MANAGED IMAGE
+image:
+  repository: devopse2e.azurecr.io/order-service
+  tag: "v1.0.134"
+appVersion: "v1.0.134"
+# END AZURE PIPELINES MANAGED IMAGE
