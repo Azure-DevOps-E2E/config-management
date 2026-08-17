@@ -141,6 +141,7 @@ and error examples.
 | `scripts/wait-health.ps1` | Polls all component health routes until ready or timed out |
 | `scripts/health.ps1` | Reports component status, version, latency, and optional version match |
 | `scripts/smoke.ps1` | Runs an end-to-end read/create/read order scenario |
+| `scripts/update-manifest.sh` | Updates DEV/PROD Helm image overrides from runtime pipelines |
 
 Verify one deployed service reports the expected immutable version:
 
@@ -239,6 +240,7 @@ config-management/
 ├── scripts/
 │   ├── health.ps1
 │   ├── smoke.ps1
+│   ├── update-manifest.sh
 │   ├── update-manifest.ps1
 │   └── wait-health.ps1
 ├── .env.example
