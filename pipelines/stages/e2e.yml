@@ -4,8 +4,6 @@ stages:
     jobs:
       - job: ComposeSmoke
         displayName: Build, start and smoke test all services
-        pool:
-          vmImage: $(vmImage)
         workspace:
           clean: all
         steps:

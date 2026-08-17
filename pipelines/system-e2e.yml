@@ -79,9 +79,8 @@ resources:
       name: Azure-DevOps-E2E/api-gateway
       ref: refs/heads/main
 
-variables:
-  - name: vmImage
-    value: ubuntu-latest
+pool:
+  name: azure-agent
 
 extends:
   template: templates/pipeline-contract.yml
