@@ -7,3 +7,10 @@ resources:
   limits:
     cpu: 750m
     memory: 768Mi
+
+# BEGIN AZURE PIPELINES MANAGED IMAGE
+image:
+  repository: devopse2e.azurecr.io/order-service
+  tag: "candidate-866bb9c79d085b557c152d989f1f0dd731be11fd"
+appVersion: "candidate-866bb9c79d085b557c152d989f1f0dd731be11fd"
+# END AZURE PIPELINES MANAGED IMAGE
