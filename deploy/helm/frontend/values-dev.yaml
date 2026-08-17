@@ -7,3 +7,10 @@ resources:
   limits:
     cpu: 250m
     memory: 128Mi
+
+# BEGIN AZURE PIPELINES MANAGED IMAGE
+image:
+  repository: devopse2e.azurecr.io/frontend
+  tag: "candidate-e4c40b43fdca66b0828052f9b716c1338827c224"
+appVersion: "candidate-e4c40b43fdca66b0828052f9b716c1338827c224"
+# END AZURE PIPELINES MANAGED IMAGE
