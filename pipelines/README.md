@@ -44,8 +44,8 @@ those files. Use the names `<service>-ci`, `<service>-dev`, and
 `<service>-prod`.
 
 Azure-native operations stay inline in each service pipeline, including
-checkout, report publication, Docker, PowerShell, deployment jobs, and GitHub
-Release tasks. Shared scripts run language quality checks in disposable
+checkout, report publication, Docker, Bash, deployment jobs, Git tagging, and
+GitHub Release API calls. Shared scripts run language quality checks in disposable
 containers and implement Trivy scanning, candidate resolution, digest-safe
 image promotion, and manifest updates.
 
@@ -81,7 +81,7 @@ and Go dependencies without carrying an old Python virtual environment into a
 new run.
 
 The self-hosted Linux agents still require Git, Bash, Docker Engine with socket
-access, and PowerShell 7 for manifest updates. `UseDotNet@2` supplies the SDK
+access, and Bash and curl for manifest updates and GitHub Release creation. `UseDotNet@2` supplies the SDK
 needed by `PublishCodeCoverageResults@2`.
 
 ## Image promotion
@@ -97,7 +97,7 @@ A qualifying `main` pipeline resolves the commit merged from `dev`, pulls
 `candidate-<dev-commit-sha>`, and retags that same image as:
 
 ```text
-<acr>/<service>:v1.0.<Build.BuildId>
+<acr>/<service>:<releaseTag>
 <acr>/<service>:prod
 ```
 
@@ -117,15 +117,20 @@ start the separate `system-e2e` pipeline.
 
 ## Git tag and GitHub Release
 
-After the PROD manifest commit succeeds, `GitHubRelease@1`:
+The PROD pipeline exposes a runtime `releaseTag` input before promotion. Use a
+strict semantic tag such as `v1.0.119`; the pipeline validates
+`v<major>.<minor>.<patch>` before retagging the candidate image.
 
-1. creates `v1.0.<Build.BuildId>` at the triggering `main` commit;
-2. creates a GitHub Release with the same tag;
-3. includes the promoted image, digest, DEV candidate commit, PROD commit, and
-   generated changelog.
+After the PROD manifest commit succeeds, the release job uses the persisted
+GitHub checkout credentials to:
 
-The tag and release are therefore not created when the Production approval or
-manifest update fails.
+1. create the requested Git tag at the triggering `main` commit;
+2. push the tag to GitHub;
+3. create a GitHub Release through the GitHub API with the same tag;
+4. include the promoted image, digest, DEV candidate commit, and PROD commit.
+
+The tag and release are therefore not created when the Production approval,
+image promotion, or manifest update fails.
 
 ## Required Azure DevOps configuration
 
@@ -148,7 +153,7 @@ Required service connections:
 
 | Name | Requirement |
 |---|---|
-| `github.com_Azure-DevOps-E2E` | Read/write `config-management` so manifest commits can be pushed; also create service Git tags and GitHub Releases |
+| `github.com_Azure-DevOps-E2E` | Read/write `config-management` so manifest commits can be pushed; read/write runtime repositories so release tags and GitHub Releases can be created |
 | `acrLoginServer` | Docker Registry connection with ACR pull and push permission |
 
 Use the existing environments `Development` and `Production` for the manifest
