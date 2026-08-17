@@ -115,9 +115,9 @@ Required service connections:
 | `acrLoginServer` | Docker Registry connection with ACR pull and push permission |
 | value of `azureServiceConnection` | Azure Resource Manager access to the target AKS cluster |
 
-Create environments `nexuscart-dev` and `nexuscart-prod`. Put the production
-approval/check on `nexuscart-prod`; the YAML deployment job automatically
-waits for that environment check.
+Use the existing environments `Development` and `Production`. Put the
+production approval/check on `Production`; the YAML deployment job
+automatically waits for that environment check.
 
 Qodana is not part of these pipelines, so the Marketplace extension and
 `QODANA_TOKEN` are not required.
