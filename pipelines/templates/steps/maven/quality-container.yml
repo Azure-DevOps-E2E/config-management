@@ -1,0 +1,13 @@
+parameters:
+- name: cacheKey
+  type: string
+  default: maven-java21
+
+steps:
+- template: ../container/run-build-command.yml
+  parameters:
+    displayName: 'Test and build with Maven in Docker'
+    cacheKey: ${{ parameters.cacheKey }}
+    command: |
+      mvn --batch-mode --no-transfer-progress verify
+

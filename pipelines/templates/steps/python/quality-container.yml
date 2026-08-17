@@ -1,0 +1,38 @@
+parameters:
+- name: cacheKey
+  type: string
+  default: python313
+- name: requirementsFile
+  type: string
+  default: requirements-dev.txt
+- name: coverageSource
+  type: string
+  default: app
+- name: testResultsFile
+  type: string
+  default: reports/test-results.xml
+- name: coverageReportFile
+  type: string
+  default: coverage/cobertura-coverage.xml
+- name: compileTargets
+  type: string
+  default: app tests
+
+steps:
+- template: ../container/run-build-command.yml
+  parameters:
+    displayName: 'Lint and test Python application in Docker'
+    cacheKey: ${{ parameters.cacheKey }}
+    command: |
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      python -m pip install --upgrade pip
+      python -m pip install --requirement '${{ parameters.requirementsFile }}'
+      mkdir -p reports coverage
+      python -m pytest \
+        --junitxml='${{ parameters.testResultsFile }}' \
+        --cov='${{ parameters.coverageSource }}' \
+        --cov-report=term-missing \
+        --cov-report=xml:'${{ parameters.coverageReportFile }}'
+      python -m ruff check .
+      python -m compileall -q ${{ parameters.compileTargets }}

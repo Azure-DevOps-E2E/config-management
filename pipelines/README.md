@@ -44,10 +44,10 @@ those files. Use the names `<service>-ci`, `<service>-dev`, and
 `<service>-prod`.
 
 Azure-native operations stay inline in each service pipeline, including
-checkout, runtime setup, report publication, Docker, PowerShell, deployment
-jobs, and GitHub Release tasks. Shared scripts implement test commands, Trivy
-scanning, candidate resolution, digest-safe image promotion, and manifest
-updates.
+checkout, report publication, Docker, PowerShell, deployment jobs, and GitHub
+Release tasks. Shared scripts run language quality checks in disposable
+containers and implement Trivy scanning, candidate resolution, digest-safe
+image promotion, and manifest updates.
 
 The required outer contract is:
 
@@ -59,6 +59,30 @@ extends:
     - stage: CI
       # jobs and steps remain visible here
 ```
+
+## Containerized CI quality
+
+Self-hosted agents do not need Java, Maven, Node.js, Python, or Go installed.
+Each quality job pulls one version-matched Docker Official Image, runs all
+dependency installation, linting, tests, and coverage generation in a single
+`docker run --rm`, then publishes the mounted reports from the host:
+
+| Runtime input | Docker Hub image |
+|---|---|
+| Java `21` | `maven:3.9.16-eclipse-temurin-21-alpine` |
+| Node.js `24.x` | `node:24.19.0-alpine3.24` |
+| Python `3.13` | `python:3.13.14-alpine3.24` |
+| Go `1.26.6` | `golang:1.26.6-alpine3.24` |
+
+The source directory is mounted at `/workspace`, so JUnit and coverage files
+survive container removal. A per-service home directory under
+`$(Pipeline.Workspace)/.ci-container-home` caches downloaded Maven, npm, pip,
+and Go dependencies without carrying an old Python virtual environment into a
+new run.
+
+The self-hosted Linux agents still require Git, Bash, Docker Engine with socket
+access, and PowerShell 7 for manifest updates. `UseDotNet@2` supplies the SDK
+needed by `PublishCodeCoverageResults@2`.
 
 ## Image promotion
 

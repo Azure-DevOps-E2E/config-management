@@ -1,0 +1,29 @@
+parameters:
+- name: cacheKey
+  type: string
+  default: node24
+- name: testResultsFile
+  type: string
+  default: reports/test-results.xml
+- name: coverageFile
+  type: string
+  default: coverage/lcov.info
+
+steps:
+- template: ../container/run-build-command.yml
+  parameters:
+    displayName: 'Check and test Node.js application in Docker'
+    cacheKey: ${{ parameters.cacheKey }}
+    command: |
+      mkdir -p reports coverage
+      npm ci
+      node --test \
+        --experimental-test-coverage \
+        --test-reporter=spec \
+        --test-reporter=junit \
+        --test-reporter=lcov \
+        --test-reporter-destination=stdout \
+        --test-reporter-destination='${{ parameters.testResultsFile }}' \
+        --test-reporter-destination='${{ parameters.coverageFile }}'
+      npm run check
+

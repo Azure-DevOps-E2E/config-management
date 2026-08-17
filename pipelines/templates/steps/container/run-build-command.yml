@@ -1,0 +1,38 @@
+parameters:
+- name: displayName
+  type: string
+- name: command
+  type: string
+- name: cacheKey
+  type: string
+- name: workingDirectory
+  type: string
+  default: /workspace
+
+steps:
+- bash: |
+    set -euo pipefail
+
+    image='$(resolvedBuildImage)'
+    if [ -z "$image" ]; then
+      echo '##vso[task.logissue type=error]resolvedBuildImage is empty'
+      exit 1
+    fi
+
+    ci_home="$(Pipeline.Workspace)/.ci-container-home/${{ parameters.cacheKey }}"
+    mkdir -p "$ci_home"
+
+    docker run --rm \
+      --user "${UID}:${GROUPS[0]}" \
+      --env CI=true \
+      --env HOME=/tmp/ci-home \
+      --volume "$(Build.SourcesDirectory):/workspace" \
+      --volume "$ci_home:/tmp/ci-home" \
+      --workdir '${{ parameters.workingDirectory }}' \
+      --entrypoint /bin/sh \
+      "$image" \
+      -ec "$BUILD_COMMAND"
+  displayName: ${{ parameters.displayName }}
+  env:
+    BUILD_COMMAND: ${{ parameters.command }}
+

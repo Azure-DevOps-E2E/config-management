@@ -1,0 +1,35 @@
+parameters:
+- name: runtime
+  type: string
+- name: version
+  type: string
+
+steps:
+- bash: |
+    set -euo pipefail
+
+    key='${{ parameters.runtime }}:${{ parameters.version }}'
+    case "$key" in
+      java:21)
+        image='maven:3.9.16-eclipse-temurin-21-alpine'
+        ;;
+      node:24|node:24.x|node:24.19.0)
+        image='node:24.19.0-alpine3.24'
+        ;;
+      python:3.13|python:3.13.14)
+        image='python:3.13.14-alpine3.24'
+        ;;
+      go:1.26|go:1.26.x|go:1.26.6)
+        image='golang:1.26.6-alpine3.24'
+        ;;
+      *)
+        echo "##vso[task.logissue type=error]No CI image is mapped for $key"
+        exit 1
+        ;;
+    esac
+
+    echo "Pulling CI image: $image"
+    docker pull "$image"
+    echo "##vso[task.setvariable variable=resolvedBuildImage]$image"
+  displayName: 'Resolve and pull CI image'
+

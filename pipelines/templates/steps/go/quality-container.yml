@@ -1,0 +1,48 @@
+parameters:
+- name: cacheKey
+  type: string
+  default: go126
+- name: testResultsFile
+  type: string
+  default: reports/test-results.xml
+- name: coverageProfile
+  type: string
+  default: coverage.out
+- name: coverageReportFile
+  type: string
+  default: coverage/cobertura-coverage.xml
+- name: gotestsumVersion
+  type: string
+  default: v1.13.0
+- name: gocoverCoberturaVersion
+  type: string
+  default: v1.5.0
+
+steps:
+- template: ../container/run-build-command.yml
+  parameters:
+    displayName: 'Vet and test Go application in Docker'
+    cacheKey: ${{ parameters.cacheKey }}
+    command: |
+      tools_dir=/tmp/ci-home/bin
+      mkdir -p "$tools_dir" reports coverage
+      GOBIN="$tools_dir" go install gotest.tools/gotestsum@${{ parameters.gotestsumVersion }}
+      GOBIN="$tools_dir" go install github.com/boumenot/gocover-cobertura@${{ parameters.gocoverCoberturaVersion }}
+
+      test_exit=0
+      "$tools_dir/gotestsum" \
+        --junitfile '${{ parameters.testResultsFile }}' \
+        -- \
+        -coverprofile='${{ parameters.coverageProfile }}' \
+        -covermode=atomic \
+        ./... || test_exit=$?
+
+      if [ -s '${{ parameters.coverageProfile }}' ]; then
+        "$tools_dir/gocover-cobertura" < '${{ parameters.coverageProfile }}' > '${{ parameters.coverageReportFile }}'
+      fi
+
+      if [ "$test_exit" -ne 0 ]; then
+        exit "$test_exit"
+      fi
+
+      go vet ./...

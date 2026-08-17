@@ -1,0 +1,29 @@
+parameters:
+- name: cacheKey
+  type: string
+  default: node24
+- name: testResultsFile
+  type: string
+  default: reports/test-results.xml
+- name: coverageDirectory
+  type: string
+  default: coverage
+
+steps:
+- template: ../container/run-build-command.yml
+  parameters:
+    displayName: 'Lint and test Node.js application in Docker'
+    cacheKey: ${{ parameters.cacheKey }}
+    command: |
+      mkdir -p '${{ parameters.coverageDirectory }}' reports
+      npm ci
+      npm run test:run -- \
+        --reporter=default \
+        --reporter=junit \
+        --outputFile.junit='${{ parameters.testResultsFile }}' \
+        --coverage \
+        --coverage.reporter=text \
+        --coverage.reporter=cobertura \
+        --coverage.reportsDirectory='${{ parameters.coverageDirectory }}'
+      npm run typecheck
+
