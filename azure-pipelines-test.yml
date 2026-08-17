@@ -1,6 +1,7 @@
 trigger:
   branches:
-    azure-pipeline-test
+    include:  
+    - azure-pipeline-test
 pool:
   name: azure-agent
 
