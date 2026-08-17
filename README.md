@@ -239,6 +239,7 @@ config-management/
 ├── scripts/
 │   ├── health.ps1
 │   ├── smoke.ps1
+│   ├── update-manifest.ps1
 │   └── wait-health.ps1
 ├── .env.example
 └── README.md

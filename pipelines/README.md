@@ -11,8 +11,8 @@ required contract and reusable script implementations.
 |---|---|---|
 | Push to `feature/*` | `<service>-ci`: `CI` | Test, coverage, lint, and build validation only |
 | Open or update a PR targeting `dev` or `main` | `<service>-ci`: `CI` | Validate the GitHub PR merge commit; no image build or deployment |
-| Push or merge to `dev` | `<service>-dev`: `CI -> BuildCandidate -> DeployDev -> VerifyDev` | Build once, scan, push an immutable candidate, deploy and verify DEV |
-| Merge `dev` into `main` | `<service>-prod`: `CI -> ResolveCandidate -> PromoteImage -> DeployProd -> VerifyProd -> Release` | Promote the exact DEV image without rebuilding, deploy PROD, then create a Git tag and GitHub Release |
+| Push or merge to `dev` | `<service>-dev`: `CI -> BuildCandidate -> UpdateManifest` | Build once, scan, push an immutable candidate, then commit its tag to `values-dev.yaml` |
+| Merge `dev` into `main` | `<service>-prod`: `CI -> ResolveCandidate -> PromoteImage -> UpdateManifest -> Release` | Promote the exact DEV image without rebuilding, commit `values-prod.yaml`, then create a Git tag and GitHub Release |
 | Direct push to `main` | `<service>-prod`: `CI -> ResolveCandidate` | CI runs, but production promotion is skipped because the commit did not come from `dev` |
 
 Pull-request validation is enabled only in `azure-pipelines.yml` for target
@@ -35,8 +35,8 @@ points:
 
 ```text
 azure-pipelines.yml       # feature/*: CI
-azure-pipelines-dev.yml   # dev: CI, candidate build, Development deploy/verify
-azure-pipelines-prod.yml  # main: CI, promote, Production deploy/verify, release
+azure-pipelines-dev.yml   # dev: CI, candidate build, DEV manifest update
+azure-pipelines-prod.yml  # main: CI, promote, PROD manifest update, release
 ```
 
 Create three Azure Pipeline definitions for each service and point them to
@@ -44,10 +44,10 @@ those files. Use the names `<service>-ci`, `<service>-dev`, and
 `<service>-prod`.
 
 Azure-native operations stay inline in each service pipeline, including
-checkout, runtime setup, report publication, Docker, Helm, PowerShell, and
-GitHub Release tasks. Shared templates are used only for scripts such as test
-commands, Trivy scanning, candidate resolution, and digest-safe image
-promotion.
+checkout, runtime setup, report publication, Docker, PowerShell, deployment
+jobs, and GitHub Release tasks. Shared scripts implement test commands, Trivy
+scanning, candidate resolution, digest-safe image promotion, and manifest
+updates.
 
 The required outer contract is:
 
@@ -81,20 +81,27 @@ The promotion script compares the source, release, and `prod` digests. It
 fails if the candidate is missing or if any digest changes. There is no
 production rebuild or fallback build.
 
-Helm deploys the immutable candidate tag to DEV and the immutable release tag
-to PROD. The mutable `dev` and `prod` tags are convenience pointers only.
+The DEV pipeline commits the immutable candidate tag to
+`deploy/helm/<service>/values-dev.yaml`. After promotion and the `Production`
+environment approval, the PROD pipeline commits the immutable release tag to
+`values-prod.yaml`. Direct Helm deployment and runtime verification remain
+disabled until AKS and public endpoints are available. The mutable `dev` and
+`prod` tags are convenience pointers only.
+
+Manifest commits include `[skip ci]`, so updating `config-management` does not
+start the separate `system-e2e` pipeline.
 
 ## Git tag and GitHub Release
 
-After PROD deployment and verification succeed, `GitHubRelease@1`:
+After the PROD manifest commit succeeds, `GitHubRelease@1`:
 
 1. creates `v1.0.<Build.BuildId>` at the triggering `main` commit;
 2. creates a GitHub Release with the same tag;
 3. includes the promoted image, digest, DEV candidate commit, PROD commit, and
    generated changelog.
 
-The tag and release are therefore not created when deployment or verification
-fails.
+The tag and release are therefore not created when the Production approval or
+manifest update fails.
 
 ## Required Azure DevOps configuration
 
@@ -105,11 +112,9 @@ load the deployment variable group:
 | Variable | Purpose |
 |---|---|
 | `acrLoginServer` | ACR hostname, for example `nexuscart.azurecr.io` |
-| `azureServiceConnection` | Azure Resource Manager service connection name |
-| `aksResourceGroup` | AKS resource group |
-| `aksClusterName` | AKS cluster |
-| `devBaseUrl` | Public DEV gateway base URL |
-| `prodBaseUrl` | Public PROD gateway base URL |
+
+AKS resource group, cluster, and environment URLs are intentionally not
+required while direct deployment and runtime verification are disabled.
 
 Each YAML independently declares only the values it needs, including its
 service name, runtime version, report paths, image details, and service
@@ -119,13 +124,12 @@ Required service connections:
 
 | Name | Requirement |
 |---|---|
-| `github.com_Azure-DevOps-E2E` | Read `config-management`; for releases it must be an OAuth or PAT GitHub connection with repository contents write permission |
+| `github.com_Azure-DevOps-E2E` | Read/write `config-management` so manifest commits can be pushed; also create service Git tags and GitHub Releases |
 | `acrLoginServer` | Docker Registry connection with ACR pull and push permission |
-| value of `azureServiceConnection` | Azure Resource Manager access to the target AKS cluster |
 
-Use the existing environments `Development` and `Production`. Put the
-production approval/check on `Production`; the YAML deployment job
-automatically waits for that environment check.
+Use the existing environments `Development` and `Production` for the manifest
+update deployment jobs. Put the production approval/check on `Production`;
+the PROD manifest cannot be committed until that approval succeeds.
 
 Qodana is not part of these pipelines, so the Marketplace extension and
 `QODANA_TOKEN` are not required.
