@@ -10,6 +10,9 @@ parameters:
 - name: cacheDir
   type: string
   default: '$(Agent.TempDirectory)/qodana/cache'
+- name: maxMemory
+  type: string
+  default: '1536m'
 - name: requiresToken
   type: boolean
   default: false
@@ -35,19 +38,33 @@ steps:
     
     RESULTS_DIR="${{ parameters.resultsDir }}"
     CACHE_DIR="${{ parameters.cacheDir }}"
+    MAX_MEM="${{ parameters.maxMemory }}"
     mkdir -p "$RESULTS_DIR" "$CACHE_DIR"
 
     echo "Using Linter: ${{ parameters.linter }}"
     echo "Scanning Directory: ${{ parameters.projectDir }}"
+    echo "JVM Max Memory Limit: $MAX_MEM"
     
-    # Run Qodana CLI or Docker container scanner
+    set +e
     docker run --rm \
       --volume "${{ parameters.projectDir }}:/data/project" \
       --volume "$RESULTS_DIR:/data/results" \
       --volume "$CACHE_DIR:/data/cache" \
       --env QODANA_TOKEN="$(QODANA_TOKEN)" \
+      --env QODANA_JVM_ARGS="-Xmx$MAX_MEM -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC" \
       ${{ parameters.linter }} \
       --save-report
+    
+    STATUS=$?
+    set -e
+
+    if [ $STATUS -eq 137 ]; then
+      echo "##vso[task.logissue type=error]Qodana container exited with code 137 (Out Of Memory). Try tuning maxMemory parameter or increasing build agent RAM."
+      exit 137
+    elif [ $STATUS -ne 0 ]; then
+      echo "##vso[task.logissue type=error]Qodana scan exited with code $STATUS"
+      exit $STATUS
+    fi
 
     echo "##[section]Qodana Scan completed successfully. Report generated at $RESULTS_DIR"
   displayName: 'Qodana Step 1: Run Static Analysis & Collect Report'
