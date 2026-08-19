@@ -1,0 +1,102 @@
+parameters:
+- name: targetBranch
+  type: string
+  default: 'main'
+
+steps:
+- bash: |
+    set -euo pipefail
+
+    echo "##[section]Analyzing Git diff to classify code vs documentation changes..."
+
+    # Determine baseline commit/branch to diff against
+    TARGET="${SYSTEM_PULLREQUEST_TARGETBRANCH:-${{ parameters.targetBranch }}}"
+    TARGET="${TARGET#refs/heads/}"
+    
+    git fetch origin "$TARGET" --depth=50 || true
+    
+    BASE_COMMIT=""
+    if git rev-parse --verify "origin/$TARGET" >/dev/null 2>&1; then
+      BASE_COMMIT="origin/$TARGET"
+    elif git rev-parse --verify "HEAD~1" >/dev/null 2>&1; then
+      BASE_COMMIT="HEAD~1"
+    fi
+
+    if [ -z "$BASE_COMMIT" ]; then
+      echo "##[warning]Could not determine base commit. Defaulting to full CI execution."
+      echo "##vso[task.setvariable variable=skipHeavyCI;isOutput=true]false"
+      echo "##vso[task.setvariable variable=isDocOnly;isOutput=true]false"
+      echo "##vso[task.setvariable variable=codeChanged;isOutput=true]true"
+      echo "##vso[task.setvariable variable=dockerfileChanged;isOutput=true]false"
+      echo "##vso[task.setvariable variable=helmChanged;isOutput=true]false"
+      echo "##vso[task.setvariable variable=pipelineChanged;isOutput=true]false"
+      exit 0
+    fi
+
+    echo "Diffing HEAD against base: $BASE_COMMIT"
+    CHANGED_FILES=$(git diff --name-only "$BASE_COMMIT"...HEAD)
+
+    if [ -z "$CHANGED_FILES" ]; then
+      echo "No changed files detected. Running full CI as fallback."
+      echo "##vso[task.setvariable variable=skipHeavyCI;isOutput=true]false"
+      echo "##vso[task.setvariable variable=isDocOnly;isOutput=true]false"
+      echo "##vso[task.setvariable variable=codeChanged;isOutput=true]true"
+      echo "##vso[task.setvariable variable=dockerfileChanged;isOutput=true]false"
+      echo "##vso[task.setvariable variable=helmChanged;isOutput=true]false"
+      echo "##vso[task.setvariable variable=pipelineChanged;isOutput=true]false"
+      exit 0
+    fi
+
+    echo "##[group]Changed files in this commit/PR:"
+    echo "$CHANGED_FILES"
+    echo "##[endgroup]"
+
+    doc_only=true
+    code_changed=false
+    dockerfile_changed=false
+    helm_changed=false
+    pipeline_changed=false
+
+    while IFS= read -r file; do
+      [ -z "$file" ] && continue
+      
+      # Check if file is documentation only
+      case "$file" in
+        *.md|docs/*|LICENSE*|.gitignore|.dockerignore)
+          ;; # Is doc or ignore file
+        *Dockerfile*)
+          dockerfile_changed=true
+          doc_only=false
+          ;;
+        *deploy/helm/*|*values*.yaml)
+          helm_changed=true
+          doc_only=false
+          ;;
+        *azure-pipelines*.yml|*pipelines/*)
+          pipeline_changed=true
+          doc_only=false
+          ;;
+        *)
+          # Any other file (source code, tests, configs, pom.xml, go.mod, package.json, etc.)
+          code_changed=true
+          doc_only=false
+          ;;
+      esac
+    done <<< "$CHANGED_FILES"
+
+    skip_heavy_ci=false
+    if [ "$doc_only" = true ]; then
+      skip_heavy_ci=true
+      echo "##[section]RESULT: ONLY documentation files changed. Heavy CI (unit tests, coverage, qodana) will be SKIPPED."
+    else
+      echo "##[section]RESULT: Mixed or code changes detected (Code: $code_changed, Docker: $dockerfile_changed, Helm: $helm_changed, Pipeline: $pipeline_changed). Full CI will RUN."
+    fi
+
+    echo "##vso[task.setvariable variable=skipHeavyCI;isOutput=true]$skip_heavy_ci"
+    echo "##vso[task.setvariable variable=isDocOnly;isOutput=true]$doc_only"
+    echo "##vso[task.setvariable variable=codeChanged;isOutput=true]$code_changed"
+    echo "##vso[task.setvariable variable=dockerfileChanged;isOutput=true]$dockerfile_changed"
+    echo "##vso[task.setvariable variable=helmChanged;isOutput=true]$helm_changed"
+    echo "##vso[task.setvariable variable=pipelineChanged;isOutput=true]$pipeline_changed"
+  displayName: 'Detect Git Changes & Classify Diff (Docs vs Code)'
+  name: detect

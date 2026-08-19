@@ -29,17 +29,51 @@ steps:
 
 - bash: |
     set -euo pipefail
-    mkdir -p "$(Pipeline.Workspace)/.trivy-cache"
-    docker run --rm \
-      --volume /var/run/docker.sock:/var/run/docker.sock \
-      --volume "$(Pipeline.Workspace)/.trivy-cache:/root/.cache/" \
-      aquasec/trivy:0.72.0 \
-      image \
+    TRIVY_BIN_DIR="$(Pipeline.Workspace)/.trivy-bin"
+    TRIVY_VERSION='0.72.0'
+    TRIVY_OS="$(uname -s)"
+    TRIVY_ARCH="$(uname -m)"
+
+    case "$TRIVY_OS" in
+      Linux|Darwin) ;;
+      *)
+        echo "Unsupported operating system: $TRIVY_OS" >&2
+        exit 1
+        ;;
+    esac
+
+    case "$TRIVY_ARCH" in
+      x86_64|amd64)
+        TRIVY_ARCH='64bit'
+        ;;
+      aarch64|arm64)
+        TRIVY_ARCH='ARM64'
+        ;;
+      *)
+        echo "Unsupported architecture: $TRIVY_ARCH" >&2
+        exit 1
+        ;;
+    esac
+
+    mkdir -p "$TRIVY_BIN_DIR" "$(Pipeline.Workspace)/.trivy-cache"
+
+    if [ ! -x "$TRIVY_BIN_DIR/trivy" ]; then
+      curl -fsSL \
+        -o "$AGENT_TEMPDIRECTORY/trivy.tar.gz" \
+        "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_${TRIVY_OS}-${TRIVY_ARCH}.tar.gz"
+      tar -xzf "$AGENT_TEMPDIRECTORY/trivy.tar.gz" -C "$TRIVY_BIN_DIR"
+      chmod +x "$TRIVY_BIN_DIR/trivy"
+    fi
+
+    export PATH="$TRIVY_BIN_DIR:$PATH"
+
+    trivy image \
+      --cache-dir "$(Pipeline.Workspace)/.trivy-cache" \
       --exit-code 1 \
       --ignore-unfixed \
       --severity HIGH,CRITICAL \
       "$SCAN_IMAGE"
-  displayName: 'Scan Docker image with Trivy'
+  displayName: 'Scan Docker image with Trivy CLI'
   env:
     SCAN_IMAGE: '${{ parameters.imageName }}:scan-$(Build.BuildId)'
 

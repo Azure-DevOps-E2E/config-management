@@ -1,0 +1,61 @@
+parameters:
+- name: linter
+  type: string
+  description: 'Qodana linter docker image (e.g. jetbrains/qodana-jvm-community, jetbrains/qodana-go, jetbrains/qodana-python, jetbrains/qodana-js)'
+- name: projectDir
+  type: string
+  default: '$(Build.SourcesDirectory)'
+- name: resultsDir
+  type: string
+  default: '$(Agent.TempDirectory)/qodana/results'
+- name: cacheDir
+  type: string
+  default: '$(Agent.TempDirectory)/qodana/cache'
+- name: requiresToken
+  type: boolean
+  default: false
+
+steps:
+- task: Cache@2
+  displayName: 'Restore Qodana cache'
+  condition: succeeded()
+  inputs:
+    key: '"qodana" | "$(Agent.OS)" | "${{ parameters.linter }}" | "$(Build.Repository.Name)"'
+    restoreKeys: |
+      "qodana" | "$(Agent.OS)" | "${{ parameters.linter }}"
+      "qodana" | "$(Agent.OS)"
+    path: ${{ parameters.cacheDir }}
+
+- bash: |
+    set -euo pipefail
+    
+    echo "##[section]STEP 1: Executing Qodana Static Analysis Scan..."
+    
+    RESULTS_DIR="${{ parameters.resultsDir }}"
+    CACHE_DIR="${{ parameters.cacheDir }}"
+    mkdir -p "$RESULTS_DIR" "$CACHE_DIR"
+
+    echo "Using Linter: ${{ parameters.linter }}"
+    echo "Scanning Directory: ${{ parameters.projectDir }}"
+    
+    # Run Qodana CLI or Docker container scanner
+    docker run --rm \
+      --volume "${{ parameters.projectDir }}:/data/project" \
+      --volume "$RESULTS_DIR:/data/results" \
+      --volume "$CACHE_DIR:/data/cache" \
+      --env QODANA_TOKEN="$(QODANA_TOKEN)" \
+      ${{ parameters.linter }} \
+      --save-report
+
+    echo "##[section]Qodana Scan completed successfully. Report generated at $RESULTS_DIR"
+  displayName: 'Qodana Step 1: Run Static Analysis & Collect Report'
+  name: qodanaScan
+  condition: succeeded()
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Qodana Report Artifact'
+  condition: always()
+  inputs:
+    PathtoPublish: '${{ parameters.resultsDir }}'
+    ArtifactName: 'qodana-report'
+    publishLocation: 'Container'

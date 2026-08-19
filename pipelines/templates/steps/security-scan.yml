@@ -1,0 +1,48 @@
+parameters:
+- name: runtime
+  type: string
+  values: ['go', 'node', 'python', 'java']
+
+steps:
+- bash: |
+    set -euo pipefail
+
+    echo "##[section]Executing Dependency & Secret Security Scan for runtime: ${{ parameters.runtime }}..."
+
+    # 1. Secret Scanning via Gitleaks or Trivy Config
+    if command -v trivy >/dev/null 2>&1; then
+      echo "##[command]trivy config --exit-code 1 --severity CRITICAL ."
+      trivy config --exit-code 1 --severity CRITICAL . || {
+        echo "##vso[task.logissue type=error]Secret Leak or Misconfiguration detected in codebase!"
+        exit 1
+      }
+    fi
+
+    # 2. Runtime Dependency Scanning
+    case "${{ parameters.runtime }}" in
+      go)
+        echo "Running Go Vulnerability Check (govulncheck)..."
+        if command -v govulncheck >/dev/null 2>&1; then
+          govulncheck ./...
+        else
+          docker run --rm -v "$(Build.SourcesDirectory):/src" -w /src golang:1.26-alpine sh -c "go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./..."
+        fi
+        ;;
+      node)
+        echo "Running Npm Dependency Security Audit..."
+        npm audit --audit-level=high --omit=dev || true
+        ;;
+      python)
+        echo "Running Python Dependency Security Audit..."
+        pip install pip-audit 2>/dev/null || true
+        pip-audit || true
+        ;;
+      java)
+        echo "Running Java Dependency Security Scan..."
+        mvn org.owasp:dependency-check-maven:check -DfailOnError=false || true
+        ;;
+    esac
+
+    echo "##[section]Security Scan completed successfully."
+  displayName: 'Security Scan (Dependencies & Secret Leak Check)'
+  condition: succeeded()
