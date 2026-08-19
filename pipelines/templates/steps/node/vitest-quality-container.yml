@@ -8,6 +8,9 @@ parameters:
 - name: coverageDirectory
   type: string
   default: coverage
+- name: coverageFile
+  type: string
+  default: coverage/lcov.info
 - name: condition
   type: string
   default: 'succeeded()'
