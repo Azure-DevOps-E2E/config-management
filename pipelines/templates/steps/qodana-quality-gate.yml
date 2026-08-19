@@ -26,31 +26,31 @@ steps:
       exit 0
     fi
 
-    # Parse SARIF JSON using python/jq to count issues by severity
+    # Parse SARIF JSON to count issues by severity
     CRITICAL_COUNT=$(python3 -c "
-import json
-try:
-    with open('$SARIF_FILE') as f:
-        data = json.load(f)
-    runs = data.get('runs', [])
-    results = runs[0].get('results', []) if runs else []
-    criticals = [r for r in results if r.get('level') == 'error' or r.get('properties', {}).get('severity') == 'CRITICAL']
-    print(len(criticals))
-except Exception as e:
-    print(0)
-" 2>/dev/null || echo 0)
+    import json
+    try:
+        with open('$SARIF_FILE') as f:
+            data = json.load(f)
+        runs = data.get('runs', [])
+        results = runs[0].get('results', []) if runs else []
+        criticals = [r for r in results if r.get('level') == 'error' or r.get('properties', {}).get('severity') == 'CRITICAL']
+        print(len(criticals))
+    except Exception:
+        print(0)
+    " 2>/dev/null || echo 0)
 
     TOTAL_ISSUES=$(python3 -c "
-import json
-try:
-    with open('$SARIF_FILE') as f:
-        data = json.load(f)
-    runs = data.get('runs', [])
-    results = runs[0].get('results', []) if runs else []
-    print(len(results))
-except Exception as e:
-    print(0)
-" 2>/dev/null || echo 0)
+    import json
+    try:
+        with open('$SARIF_FILE') as f:
+            data = json.load(f)
+        runs = data.get('runs', [])
+        results = runs[0].get('results', []) if runs else []
+        print(len(results))
+    except Exception:
+        print(0)
+    " 2>/dev/null || echo 0)
 
     echo "##[section]Qodana Analysis Summary:"
     echo "  - Total Problems Found: $TOTAL_ISSUES"
