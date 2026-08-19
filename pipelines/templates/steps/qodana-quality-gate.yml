@@ -5,11 +5,9 @@ parameters:
 - name: failThreshold
   type: number
   default: 0
-  description: 'Maximum allowed total problems before Quality Gate fails'
 - name: failOnCritical
   type: boolean
   default: true
-  description: 'Fail Quality Gate immediately if any CRITICAL severity issue is found'
 - name: condition
   type: string
   default: 'succeeded()'

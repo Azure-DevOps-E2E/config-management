@@ -1,7 +1,6 @@
 parameters:
 - name: linter
   type: string
-  description: 'Qodana linter docker image (e.g. jetbrains/qodana-jvm-community, jetbrains/qodana-go, jetbrains/qodana-python, jetbrains/qodana-js)'
 - name: projectDir
   type: string
   default: '$(Build.SourcesDirectory)'
