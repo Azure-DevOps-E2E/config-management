@@ -2,12 +2,16 @@ parameters:
 - name: cacheKey
   type: string
   default: maven-java21
+- name: condition
+  type: string
+  default: 'succeeded()'
 
 steps:
 - template: ../container/run-build-command.yml
   parameters:
     displayName: 'Test and build with Maven in Docker'
     cacheKey: ${{ parameters.cacheKey }}
+    condition: ${{ parameters.condition }}
     command: |
       echo '##[section]Java and Maven versions'
       java -version

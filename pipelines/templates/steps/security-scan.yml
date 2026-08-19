@@ -2,6 +2,9 @@ parameters:
 - name: runtime
   type: string
   values: ['go', 'node', 'python', 'java']
+- name: condition
+  type: string
+  default: 'succeeded()'
 
 steps:
 - bash: |
@@ -45,4 +48,4 @@ steps:
 
     echo "##[section]Security Scan completed successfully."
   displayName: 'Security Scan (Dependencies & Secret Leak Check)'
-  condition: succeeded()
+  condition: ${{ parameters.condition }}

@@ -3,6 +3,9 @@ parameters:
   type: string
 - name: version
   type: string
+- name: condition
+  type: string
+  default: 'succeeded()'
 
 steps:
 - bash: |
@@ -43,3 +46,4 @@ steps:
 
     echo "##vso[task.setvariable variable=resolvedBuildImage]$image"
   displayName: 'Resolve and pull CI image'
+  condition: ${{ parameters.condition }}

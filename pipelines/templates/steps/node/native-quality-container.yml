@@ -8,12 +8,16 @@ parameters:
 - name: coverageFile
   type: string
   default: coverage/lcov.info
+- name: condition
+  type: string
+  default: 'succeeded()'
 
 steps:
 - template: ../container/run-build-command.yml
   parameters:
     displayName: 'Check and test Node.js application in Docker'
     cacheKey: ${{ parameters.cacheKey }}
+    condition: ${{ parameters.condition }}
     command: |
       echo '##[section]Node.js and npm versions'
       node --version

@@ -17,12 +17,16 @@ parameters:
 - name: gocoverCoberturaVersion
   type: string
   default: v1.5.0
+- name: condition
+  type: string
+  default: 'succeeded()'
 
 steps:
 - template: ../container/run-build-command.yml
   parameters:
     displayName: 'Vet and test Go application in Docker'
     cacheKey: ${{ parameters.cacheKey }}
+    condition: ${{ parameters.condition }}
     command: |
       echo '##[section]Go runtime version'
       go version

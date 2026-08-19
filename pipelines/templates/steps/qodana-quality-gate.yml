@@ -10,6 +10,9 @@ parameters:
   type: boolean
   default: true
   description: 'Fail Quality Gate immediately if any CRITICAL severity issue is found'
+- name: condition
+  type: string
+  default: 'succeeded()'
 
 steps:
 - bash: |
@@ -76,4 +79,4 @@ except Exception as e:
 
     echo "##[section]✅ QODANA QUALITY GATE STATUS: PASSED"
   displayName: 'Qodana Step 2: Evaluate Quality Gate (Pass / Fail Decision)'
-  condition: succeeded()
+  condition: ${{ parameters.condition }}

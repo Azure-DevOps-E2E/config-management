@@ -14,11 +14,14 @@ parameters:
 - name: requiresToken
   type: boolean
   default: false
+- name: condition
+  type: string
+  default: 'succeeded()'
 
 steps:
 - task: Cache@2
   displayName: 'Restore Qodana cache'
-  condition: succeeded()
+  condition: ${{ parameters.condition }}
   inputs:
     key: '"qodana" | "$(Agent.OS)" | "${{ parameters.linter }}" | "$(Build.Repository.Name)"'
     restoreKeys: |
@@ -50,7 +53,7 @@ steps:
     echo "##[section]Qodana Scan completed successfully. Report generated at $RESULTS_DIR"
   displayName: 'Qodana Step 1: Run Static Analysis & Collect Report'
   name: qodanaScan
-  condition: succeeded()
+  condition: ${{ parameters.condition }}
 
 - task: PublishBuildArtifacts@1
   displayName: 'Publish Qodana Report Artifact'

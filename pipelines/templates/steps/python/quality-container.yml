@@ -17,12 +17,16 @@ parameters:
 - name: compileTargets
   type: string
   default: app tests
+- name: condition
+  type: string
+  default: 'succeeded()'
 
 steps:
 - template: ../container/run-build-command.yml
   parameters:
     displayName: 'Lint and test Python application in Docker'
     cacheKey: ${{ parameters.cacheKey }}
+    condition: ${{ parameters.condition }}
     command: |
       echo '##[section]Python runtime version'
       python --version
