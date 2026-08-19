@@ -11,6 +11,8 @@ steps:
     set -euo pipefail
 
     TAG="${{ parameters.releaseTag }}"
+    RAW_AUTO_CREATE="${{ parameters.autoCreate }}"
+    AUTO_CREATE=$(echo "$RAW_AUTO_CREATE" | tr '[:upper:]' '[:lower:]')
     
     if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       echo "##vso[task.logissue type=error]Release tag '$TAG' must match format v<major>.<minor>.<patch> (e.g., v1.0.119)"
@@ -20,7 +22,7 @@ steps:
     echo "##[section]Validating Git release tag '$TAG'..."
 
     if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-      if [ "${{ parameters.autoCreate }}" = true ]; then
+      if [ "$AUTO_CREATE" = "true" ] || [ "$AUTO_CREATE" = "1" ]; then
         echo "##[section]Release tag '$TAG' does not exist on origin. Auto-creating Git tag..."
         git config user.name 'azure-pipelines[bot]'
         git config user.email 'azure-pipelines@users.noreply.github.com'
@@ -29,7 +31,7 @@ steps:
         echo "##[section]Successfully created and pushed Git tag '$TAG' to origin."
       else
         echo "##vso[task.logissue type=error]Release tag '$TAG' does not exist on origin."
-        echo "Please create the Git tag first or enable auto-creation."
+        echo "Please create the Git tag first or set autoCreate to true."
         exit 1
       fi
     else
