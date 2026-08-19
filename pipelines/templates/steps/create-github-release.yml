@@ -1,0 +1,110 @@
+parameters:
+- name: releaseTag
+  type: string
+  default: '$(releaseTag)'
+- name: serviceName
+  type: string
+  default: '$(serviceName)'
+- name: imageRepository
+  type: string
+  default: '$(imageRepository)'
+- name: acrLoginServer
+  type: string
+  default: '$(acrLoginServer)'
+- name: promotedImageDigest
+  type: string
+  default: '$(promotedImageDigest)'
+- name: candidateSourceVersion
+  type: string
+  default: '$(candidateSourceVersion)'
+- name: buildSourceVersion
+  type: string
+  default: '$(Build.SourceVersion)'
+- name: buildRepositoryName
+  type: string
+  default: '$(Build.Repository.Name)'
+- name: waitIfMissing
+  type: boolean
+  default: true
+- name: timeoutMinutes
+  type: number
+  default: 30
+
+steps:
+- bash: |
+    set -euo pipefail
+
+    TAG="${{ parameters.releaseTag }}"
+    RAW_WAIT="${{ parameters.waitIfMissing }}"
+    WAIT_IF_MISSING=$(echo "$RAW_WAIT" | tr '[:upper:]' '[:lower:]')
+    TIMEOUT_MINUTES=${{ parameters.timeoutMinutes }}
+    TIMEOUT_SECONDS=$((TIMEOUT_MINUTES * 60))
+    SLEEP_INTERVAL=20
+
+    echo "##[section]Validating Git release tag '$TAG' on remote origin..."
+
+    if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+      if [ "$WAIT_IF_MISSING" = "true" ] || [ "$WAIT_IF_MISSING" = "1" ]; then
+        echo "##vso[task.logissue type=warning]Git tag '$TAG' does not exist on remote origin."
+        echo "##[warning]NOTIFICATION: Please create and push tag '$TAG' to origin (e.g. 'git tag $TAG && git push origin $TAG')."
+        echo "##[section]Waiting up to $TIMEOUT_MINUTES minutes for tag '$TAG' to be created..."
+
+        ELAPSED=0
+        while ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; do
+          if [ "$ELAPSED" -ge "$TIMEOUT_SECONDS" ]; then
+            echo "##vso[task.logissue type=error]Timeout reached ($TIMEOUT_MINUTES minutes). Git tag '$TAG' was not created on origin."
+            exit 1
+          fi
+          echo "Waiting for tag '$TAG'... (${ELAPSED}s / ${TIMEOUT_SECONDS}s elapsed)"
+          sleep "$SLEEP_INTERVAL"
+          ELAPSED=$((ELAPSED + SLEEP_INTERVAL))
+        done
+
+        echo "##[section]Git tag '$TAG' has been detected on origin! Proceeding with release."
+      else
+        echo "##vso[task.logissue type=error]Release tag '$TAG' does not exist on origin."
+        exit 1
+      fi
+    else
+      echo "##[section]Using existing Git tag '$TAG' for GitHub release."
+    fi
+
+    auth_header="`git config --get-all http.https://github.com/.extraheader | sed -n 's/^AUTHORIZATION: //Ip' | tail -n 1`"
+    if [[ -z "$auth_header" ]]; then
+      auth_header="`git config --get-all http.https://github.com.extraheader | sed -n 's/^AUTHORIZATION: //Ip' | tail -n 1`"
+    fi
+    if [[ -z "$auth_header" ]]; then
+      echo '##vso[task.logissue type=error]Unable to find persisted GitHub checkout credentials for release creation'
+      exit 1
+    fi
+
+    cat > release-payload.json <<EOF
+    {
+      "tag_name": "$TAG",
+      "target_commitish": "${{ parameters.buildSourceVersion }}",
+      "name": "${{ parameters.serviceName }} $TAG",
+      "body": "Production manifest update completed successfully.\n\n- Image: ${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}:$TAG\n- Digest: ${{ parameters.promotedImageDigest }}\n- DEV candidate commit: ${{ parameters.candidateSourceVersion }}\n- PROD commit: ${{ parameters.buildSourceVersion }}\n- Manifest: config-management/deploy/helm/${{ parameters.serviceName }}/values-prod.yaml",
+      "draft": false,
+      "prerelease": false,
+      "make_latest": "true"
+    }
+    EOF
+
+    status="`curl -sS -o release-response.json -w '%{http_code}' \
+      -X POST \
+      -H "Authorization: $auth_header" \
+      -H 'Accept: application/vnd.github+json' \
+      -H 'X-GitHub-Api-Version: 2022-11-28' \
+      "https://api.github.com/repos/${{ parameters.buildRepositoryName }}/releases" \
+      --data-binary @release-payload.json`"
+
+    if [[ "$status" != '201' && "$status" != '422' ]]; then
+      echo "##vso[task.logissue type=error]GitHub Release creation failed with HTTP $status"
+      cat release-response.json
+      exit 1
+    elif [[ "$status" == '422' ]]; then
+      echo "##[warning]GitHub Release $TAG already exists on origin. Skipping creation."
+    else
+      echo "Created GitHub Release $TAG"
+    fi
+  displayName: 'Create GitHub Release'
