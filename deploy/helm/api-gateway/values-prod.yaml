@@ -10,3 +10,10 @@ resources:
   limits:
     cpu: 500m
     memory: 192Mi
+
+# BEGIN AZURE PIPELINES MANAGED IMAGE
+image:
+  repository: devopse2e.azurecr.io/api-gateway
+  tag: "v1.0.194"
+appVersion: "v1.0.194"
+# END AZURE PIPELINES MANAGED IMAGE
