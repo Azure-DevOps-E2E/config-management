@@ -188,11 +188,11 @@ external template.
 
 | Azure Pipelines | YAML sources |
 |---|---|
-| `frontend-ci/dev/prod` | `frontend/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
-| `api-gateway-ci/dev/prod` | `api-gateway/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
-| `user-service-ci/dev/prod` | `user-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
-| `catalog-service-ci/dev/prod` | `catalog-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
-| `order-service-ci/dev/prod` | `order-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `frontend ci`, `frontend dev`, `frontend prod` | `frontend/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `api-gateway ci`, `api-gateway dev`, `api-gateway prod` | `api-gateway/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `user-service ci`, `user-service dev`, `user-service prod` | `user-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `catalog-service ci`, `catalog-service dev`, `catalog-service prod` | `catalog-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `order-service ci`, `order-service dev`, `order-service prod` | `order-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
 | `system-e2e` | `config-management/pipelines/system-e2e.yml` |
 
 Push `config-management` before a runtime repository so the referenced
