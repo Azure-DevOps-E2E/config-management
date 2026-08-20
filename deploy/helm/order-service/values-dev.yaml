@@ -11,6 +11,6 @@ resources:
 # BEGIN AZURE PIPELINES MANAGED IMAGE
 image:
   repository: devopse2e.azurecr.io/order-service
-  tag: "cad0d5592262d74fa4c7b5595cfc95d4a13aecce"
-appVersion: "cad0d5592262d74fa4c7b5595cfc95d4a13aecce"
+  tag: "0f1630077ef130fbb00af4e68128212e90e1396c"
+appVersion: "0f1630077ef130fbb00af4e68128212e90e1396c"
 # END AZURE PIPELINES MANAGED IMAGE
