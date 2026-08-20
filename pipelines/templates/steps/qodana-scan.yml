@@ -71,9 +71,19 @@ steps:
   name: qodanaScan
   condition: ${{ parameters.condition }}
 
+- bash: |
+    set -euo pipefail
+    if find "${{ parameters.resultsDir }}" -mindepth 1 -print -quit | grep -q .; then
+      echo "##vso[task.setvariable variable=qodanaResultsExist]true"
+    else
+      echo "##vso[task.setvariable variable=qodanaResultsExist]false"
+    fi
+  displayName: 'Detect Qodana report'
+  condition: ${{ parameters.condition }}
+
 - task: PublishBuildArtifacts@1
   displayName: 'Publish Qodana Report Artifact'
-  condition: and(always(), ${{ parameters.condition }}, exists('${{ parameters.resultsDir }}'))
+  condition: and(always(), ${{ parameters.condition }}, eq(variables['qodanaResultsExist'], 'true'))
   inputs:
     PathtoPublish: '${{ parameters.resultsDir }}'
     ArtifactName: 'qodana-report'

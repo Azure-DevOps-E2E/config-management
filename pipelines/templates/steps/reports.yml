@@ -31,9 +31,19 @@ steps:
       testRunTitle: '${{ parameters.serviceName }} tests'
 
 - ${{ if ne(parameters.coverageSummaryFile, '') }}:
+  - bash: |
+      set -euo pipefail
+      if [ -f '${{ parameters.coverageSummaryFile }}' ]; then
+        echo "##vso[task.setvariable variable=coverageSummaryFileExists]true"
+      else
+        echo "##vso[task.setvariable variable=coverageSummaryFileExists]false"
+      fi
+    displayName: 'Detect coverage report'
+    condition: succeededOrFailed()
+
   - task: PublishCodeCoverageResults@2
     displayName: 'Publish coverage report'
-    condition: and(succeededOrFailed(), exists('${{ parameters.coverageSummaryFile }}'))
+    condition: and(succeededOrFailed(), eq(variables['coverageSummaryFileExists'], 'true'))
     inputs:
       summaryFileLocation: '${{ parameters.coverageSummaryFile }}'
       pathToSources: '${{ parameters.coveragePathToSources }}'
