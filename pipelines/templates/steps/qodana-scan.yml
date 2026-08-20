@@ -12,7 +12,7 @@ parameters:
   default: '$(Agent.TempDirectory)/qodana/cache'
 - name: maxMemory
   type: string
-  default: '1536m'
+  default: '1024m'
 - name: requiresToken
   type: boolean
   default: false
@@ -51,7 +51,7 @@ steps:
       --volume "$RESULTS_DIR:/data/results" \
       --volume "$CACHE_DIR:/data/cache" \
       --env QODANA_TOKEN="$(QODANA_TOKEN)" \
-      --env QODANA_JVM_ARGS="-Xmx$MAX_MEM -XX:MaxRAMPercentage=70.0 -XX:+UseG1GC" \
+      --env QODANA_JVM_ARGS="-Xmx$MAX_MEM -XX:MaxRAMPercentage=60.0 -XX:+UseG1GC" \
       ${{ parameters.linter }} \
       --save-report
     
