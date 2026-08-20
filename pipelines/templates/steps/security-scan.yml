@@ -41,8 +41,17 @@ steps:
         ;;
       python)
         if command -v python >/dev/null 2>&1; then
-          echo "Running Python Audit..."
-          python -m pip audit 2>/dev/null || true
+          if ! command -v pip-audit >/dev/null 2>&1; then
+            echo "pip-audit not found; attempting installation..."
+            python -m pip install --disable-pip-version-check --no-input pip-audit >/dev/null 2>&1 || true
+          fi
+
+          if command -v pip-audit >/dev/null 2>&1; then
+            echo "Running pip-audit..."
+            pip-audit || true
+          else
+            echo "##vso[task.logissue type=warning]pip-audit is unavailable; skipping Python dependency audit."
+          fi
         fi
         ;;
       java)

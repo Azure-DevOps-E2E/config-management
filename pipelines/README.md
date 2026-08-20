@@ -125,11 +125,13 @@ the run stops before image promotion and the operator must create or choose an
 existing Git tag, then rerun the pipeline with that `releaseTag`.
 
 After the PROD manifest commit succeeds, the release job uses the persisted
-GitHub checkout credentials to:
+GitHub checkout credentials and the checkout origin remote to:
 
 1. confirm the requested Git tag still exists on GitHub;
-2. create a GitHub Release through the GitHub API with the same tag;
-3. include the promoted image, digest, DEV candidate commit, and PROD commit.
+2. resolve the GitHub repository slug as `owner/repo`;
+3. skip creation if a release already exists for that tag;
+4. create a GitHub Release through the GitHub API with the same tag;
+5. include the promoted image, digest, DEV candidate commit, and PROD commit.
 
 The GitHub Release is therefore not created when tag validation, Production
 approval, image promotion, or manifest update fails. The pipeline does not
