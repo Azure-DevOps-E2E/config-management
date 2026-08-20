@@ -14,6 +14,6 @@ resources:
 # BEGIN AZURE PIPELINES MANAGED IMAGE
 image:
   repository: devopse2e.azurecr.io/api-gateway
-  tag: "candidate-fcd33107dcdb38f31d6588575418ec06d19756ae"
-appVersion: "candidate-fcd33107dcdb38f31d6588575418ec06d19756ae"
+  tag: "candidate-06b2e674b64ebf0d0bbffda8d705ee22d3578a59"
+appVersion: "candidate-06b2e674b64ebf0d0bbffda8d705ee22d3578a59"
 # END AZURE PIPELINES MANAGED IMAGE
