@@ -214,7 +214,6 @@ Run the local full-stack verification:
 ```powershell
 docker compose -f compose.yaml config >/dev/null
 docker compose up --build --detach --wait
-./scripts/health.ps1 -BaseUrl http://localhost:8080
-./scripts/smoke.ps1 -BaseUrl http://localhost:8080
+./scripts/e2e.sh -BaseUrl http://localhost:8080
 docker compose down --remove-orphans
 ```
