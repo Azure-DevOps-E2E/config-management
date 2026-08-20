@@ -13,7 +13,7 @@ pr:
 resources:
   pipelines:
     - pipeline: frontendCi
-      source: frontend
+      source: frontend-ci
       trigger:
         branches:
           include:
@@ -21,7 +21,7 @@ resources:
         stages:
           - CI
     - pipeline: userServiceCi
-      source: user-service
+      source: user-service-ci
       trigger:
         branches:
           include:
@@ -29,7 +29,7 @@ resources:
         stages:
           - CI
     - pipeline: catalogServiceCi
-      source: catalog-service
+      source: catalog-service-ci
       trigger:
         branches:
           include:
@@ -37,7 +37,7 @@ resources:
         stages:
           - CI
     - pipeline: orderServiceCi
-      source: order-service
+      source: order-service-ci
       trigger:
         branches:
           include:
@@ -45,7 +45,7 @@ resources:
         stages:
           - CI
     - pipeline: apiGatewayCi
-      source: api-gateway
+      source: api-gateway-ci
       trigger:
         branches:
           include:
