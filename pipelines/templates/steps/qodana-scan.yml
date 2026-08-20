@@ -47,6 +47,7 @@ steps:
     
     set +e
     docker run --rm \
+      --user "$(id -u):$(id -g)" \
       --volume "${{ parameters.projectDir }}:/data/project" \
       --volume "$RESULTS_DIR:/data/results" \
       --volume "$CACHE_DIR:/data/cache" \
