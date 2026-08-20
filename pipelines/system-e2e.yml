@@ -80,7 +80,7 @@ resources:
       ref: refs/heads/main
 
 pool:
-  name: 'msc Azure Pipelines'
+  name: 'Azure Pipelines'
 
 extends:
   template: templates/pipeline-contract.yml
