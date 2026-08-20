@@ -26,7 +26,7 @@ stages:
             clean: true
             path: s/api-gateway
 
-          - bash: docker compose config --quiet
+          - bash: docker compose config >/dev/null
             displayName: Validate Compose configuration
             workingDirectory: $(Pipeline.Workspace)/s/devops
 
