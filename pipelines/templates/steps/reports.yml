@@ -33,7 +33,7 @@ steps:
 - ${{ if ne(parameters.coverageSummaryFile, '') }}:
   - task: PublishCodeCoverageResults@2
     displayName: 'Publish coverage report'
-    condition: succeededOrFailed()
+    condition: and(succeededOrFailed(), exists('${{ parameters.coverageSummaryFile }}'))
     inputs:
       summaryFileLocation: '${{ parameters.coverageSummaryFile }}'
       pathToSources: '${{ parameters.coveragePathToSources }}'
