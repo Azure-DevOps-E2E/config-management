@@ -89,12 +89,12 @@ needed by `PublishCodeCoverageResults@2`.
 The `dev` pipeline builds and scans these tags:
 
 ```text
-<acr>/<service>:candidate-<dev-commit-sha>
+<acr>/<service>:<dev-commit-sha>
 <acr>/<service>:dev
 ```
 
 A qualifying `main` pipeline resolves the commit merged from `dev`, pulls
-`candidate-<dev-commit-sha>`, and retags that same image as:
+`<dev-commit-sha>`, and retags that same image as:
 
 ```text
 <acr>/<service>:<releaseTag>
@@ -105,7 +105,7 @@ The promotion script compares the source, release, and `prod` digests. It
 fails if the candidate is missing or if any digest changes. There is no
 production rebuild or fallback build.
 
-The DEV pipeline commits the immutable candidate tag to
+The DEV pipeline commits the immutable dev commit tag to
 `deploy/helm/<service>/values-dev.yaml`. After promotion and the `Production`
 environment approval, the PROD pipeline commits the immutable release tag to
 `values-prod.yaml`. Direct Helm deployment and runtime verification remain
