@@ -11,6 +11,12 @@ parameters:
 - name: coverageFile
   type: string
   default: coverage/lcov.info
+- name: validationCommand
+  type: string
+  default: ''
+- name: buildCommand
+  type: string
+  default: ''
 - name: condition
   type: string
   default: 'succeeded()'
@@ -18,7 +24,7 @@ parameters:
 steps:
 - template: ../container/run-build-command.yml
   parameters:
-    displayName: 'Lint and test Node.js application in Docker'
+    displayName: 'Validate, test, and build Node.js application in Docker'
     cacheKey: ${{ parameters.cacheKey }}
     condition: ${{ parameters.condition }}
     command: |
@@ -38,6 +44,13 @@ steps:
         --coverage.reporter=text \
         --coverage.reporter=cobertura \
         --coverage.reportsDirectory='${{ parameters.coverageDirectory }}'
-      echo '##[section]TypeScript validation'
-      echo '##[command]npm run typecheck'
-      npm run typecheck
+      if [ -n '${{ parameters.validationCommand }}' ]; then
+        echo '##[section]Node.js validation'
+        echo "##[command]${{ parameters.validationCommand }}"
+        eval "${{ parameters.validationCommand }}"
+      fi
+      if [ -n '${{ parameters.buildCommand }}' ]; then
+        echo '##[section]Node.js build'
+        echo "##[command]${{ parameters.buildCommand }}"
+        eval "${{ parameters.buildCommand }}"
+      fi
