@@ -38,21 +38,11 @@ stages:
             displayName: Start and wait for the full stack
             workingDirectory: $(Pipeline.Workspace)/s/devops
 
-          - task: PowerShell@2
+          - bash: bash "$(Pipeline.Workspace)/s/devops/scripts/health.sh" -BaseUrl "http://localhost:8080"
             displayName: Check component health and versions
-            inputs:
-              pwsh: true
-              targetType: filePath
-              filePath: $(Pipeline.Workspace)/s/devops/scripts/health.ps1
-              arguments: -BaseUrl "http://localhost:8080"
 
-          - task: PowerShell@2
+          - bash: bash "$(Pipeline.Workspace)/s/devops/scripts/smoke.sh" -BaseUrl "http://localhost:8080"
             displayName: Create and verify an order through the gateway
-            inputs:
-              pwsh: true
-              targetType: filePath
-              filePath: $(Pipeline.Workspace)/s/devops/scripts/smoke.ps1
-              arguments: -BaseUrl "http://localhost:8080"
 
           - bash: |
               mkdir -p "$(Build.ArtifactStagingDirectory)/compose"
