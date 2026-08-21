@@ -15,7 +15,7 @@ stages:
       persistCredentials: true
       displayName: 'Checkout full Git history'
 
-    - template: steps/container/resolve-candidate.yml@templates
+    - template: ../steps/container/resolve-candidate.yml@templates
 
   - job: ValidateTag
     displayName: 'Require an existing release Git tag'
@@ -28,7 +28,7 @@ stages:
       persistCredentials: true
       displayName: 'Checkout source for tag validation'
 
-    - template: steps/validate-release-tag.yml@templates
+    - template: ../steps/validate-release-tag.yml@templates
       parameters:
         releaseTag: '$(releaseTag)'
 
@@ -58,7 +58,7 @@ stages:
         command: login
         containerRegistry: 'acrLoginServer'
 
-    - template: steps/container/promote.yml@templates
+    - template: ../steps/container/promote.yml@templates
       parameters:
         registry: '$(acrLoginServer)'
         repository: '$(imageRepository)'
@@ -117,4 +117,4 @@ stages:
       persistCredentials: true
       displayName: 'Checkout source for release creation'
 
-    - template: steps/create-github-release.yml@templates
+    - template: ../steps/create-github-release.yml@templates
