@@ -53,12 +53,26 @@ steps:
 
     echo "##[section]Using GitHub repository slug '$repo_slug' for release creation."
 
-    auth_header="`git config --get-all http.https://github.com/.extraheader | sed -n 's/^AUTHORIZATION: //Ip' | tail -n 1`"
+    echo "##[section]Resolving GitHub checkout credentials from git config."
+    auth_header="$(git config --get http.https://github.com/.extraheader 2>/dev/null || true)"
     if [[ -z "$auth_header" ]]; then
-      auth_header="`git config --get-all http.https://github.com.extraheader | sed -n 's/^AUTHORIZATION: //Ip' | tail -n 1`"
+      auth_header="$(git config --get http.https://github.com.extraheader 2>/dev/null || true)"
+    fi
+    if [[ -z "$auth_header" ]]; then
+      auth_header="$(
+        {
+          git config --get-regexp '^http\..*\.extraheader$' 2>/dev/null || true
+        } | awk 'BEGIN { IGNORECASE = 1 } /github\.com/ && /AUTHORIZATION:/ {
+          sub(/^.*AUTHORIZATION: /, "")
+          print
+          exit
+        }'
+      )"
     fi
     if [[ -z "$auth_header" ]]; then
       echo '##vso[task.logissue type=error]Unable to find persisted GitHub checkout credentials for release creation'
+      echo '##[debug]Available http.extraheader entries:'
+      git config --get-regexp '^http\..*\.extraheader$' 2>/dev/null || true
       exit 1
     fi
 
