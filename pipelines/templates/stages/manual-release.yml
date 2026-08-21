@@ -1,6 +1,8 @@
 parameters:
 - name: serviceName
   type: string
+- name: releaseTag
+  type: string
 
 stages:
 - stage: Release
@@ -30,7 +32,7 @@ stages:
 
     - template: ../steps/validate-release-tag.yml@templates
       parameters:
-        releaseTag: '$(releaseTag)'
+        releaseTag: ${{ parameters.releaseTag }}
         autoCreate: true
 
   - job: Promote
@@ -47,7 +49,7 @@ stages:
 
     - bash: |
         set -euo pipefail
-        if [[ ! "$(releaseTag)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        if [[ ! "${{ parameters.releaseTag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
           echo "releaseTag must match v<major>.<minor>.<patch>, for example v1.0.119"
           exit 1
         fi
@@ -64,7 +66,7 @@ stages:
         registry: '$(acrLoginServer)'
         repository: '$(imageRepository)'
         candidateTag: '$(candidateSourceVersion)'
-        releaseTag: '$(releaseTag)'
+        releaseTag: ${{ parameters.releaseTag }}
 
     - task: Docker@2
       displayName: 'Sign out of ACR'
@@ -94,7 +96,7 @@ stages:
                 --service-name "$(serviceName)" \
                 --environment prod \
                 --registry "$(acrLoginServer)" \
-                --image-tag "$(releaseTag)" \
+                --image-tag "${{ parameters.releaseTag }}" \
                 --repository-root "$(Pipeline.Workspace)/s/templates"
             name: updateManifest
             displayName: 'Update and push PROD manifest'
