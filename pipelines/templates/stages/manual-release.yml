@@ -18,7 +18,7 @@ stages:
     - template: ../steps/container/resolve-candidate.yml@templates
 
   - job: ValidateTag
-    displayName: 'Require an existing release Git tag'
+    displayName: 'Create or validate release Git tag'
     dependsOn: Resolve
     condition: and(succeeded(), eq(dependencies.Resolve.outputs['resolveCandidate.shouldPromote'], 'true'))
     steps:
@@ -31,6 +31,7 @@ stages:
     - template: ../steps/validate-release-tag.yml@templates
       parameters:
         releaseTag: '$(releaseTag)'
+        autoCreate: true
 
   - job: Promote
     displayName: 'Retag candidate for PROD without rebuild'

@@ -114,24 +114,22 @@ start the separate `system-e2e` pipeline.
 ## Git tag and GitHub Release
 
 The PROD pipeline only validates the merge source. After `dev` is merged into
-`main`, queue the separate manual release pipeline and provide an existing
-strict semantic tag such as `v1.0.119`. The manual workflow validates
-`v<major>.<minor>.<patch>` and checks that `refs/tags/<releaseTag>` already
-exists on origin before promotion. If the tag is missing, the run stops before
-image promotion and the operator must create or choose an existing Git tag,
-then rerun the manual release pipeline with that `releaseTag`.
+`main`, queue the separate manual release pipeline and provide a strict
+semantic tag such as `v1.0.119`. The manual workflow validates
+`v<major>.<minor>.<patch>` and, if the tag is missing on origin, creates and
+pushes it on the current release commit before promotion.
 
 The manual release workflow then:
 
-1. confirms the requested Git tag still exists on GitHub;
+1. validates the requested Git tag and creates it on origin when it is missing;
 2. resolves the GitHub repository slug as `owner/repo`;
 3. promotes the exact DEV image without rebuilding;
 4. commits `values-prod.yaml`;
 5. creates a GitHub Release through the GitHub API with the same tag;
 6. includes the promoted image, digest, DEV candidate commit, and PROD commit.
 
-The pipeline does not create or push Git tags; release tags must exist before
-promotion.
+The pipeline creates and pushes the Git tag when needed, then uses that tag for
+promotion and the GitHub Release.
 
 ## Required Azure DevOps configuration
 
