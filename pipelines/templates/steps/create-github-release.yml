@@ -23,53 +23,14 @@ parameters:
 - name: buildRepositoryName
   type: string
   default: '$(Build.Repository.Name)'
-- name: waitIfMissing
-  type: boolean
-  default: true
-- name: timeoutMinutes
-  type: number
-  default: 30
 
 steps:
 - bash: |
     set -euo pipefail
 
     TAG="${{ parameters.releaseTag }}"
-    RAW_WAIT="${{ parameters.waitIfMissing }}"
-    WAIT_IF_MISSING=$(echo "$RAW_WAIT" | tr '[:upper:]' '[:lower:]')
-    TIMEOUT_MINUTES=${{ parameters.timeoutMinutes }}
-    TIMEOUT_SECONDS=$((TIMEOUT_MINUTES * 60))
-    SLEEP_INTERVAL=20
-
-    echo "##[section]Validating Git release tag '$TAG' on remote origin..."
-
-    if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-      if [ "$WAIT_IF_MISSING" = "true" ] || [ "$WAIT_IF_MISSING" = "1" ]; then
-        echo "##vso[task.logissue type=warning]Git tag '$TAG' does not exist on remote origin."
-        echo "##[warning]NOTIFICATION: Please create and push tag '$TAG' to origin (e.g. 'git tag $TAG && git push origin $TAG')."
-        echo "##[section]Waiting up to $TIMEOUT_MINUTES minutes for tag '$TAG' to be created..."
-
-        ELAPSED=0
-        while ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; do
-          if [ "$ELAPSED" -ge "$TIMEOUT_SECONDS" ]; then
-            echo "##vso[task.logissue type=error]Timeout reached ($TIMEOUT_MINUTES minutes). Git tag '$TAG' was not created on origin."
-            exit 1
-          fi
-          echo "Waiting for tag '$TAG'... (${ELAPSED}s / ${TIMEOUT_SECONDS}s elapsed)"
-          sleep "$SLEEP_INTERVAL"
-          ELAPSED=$((ELAPSED + SLEEP_INTERVAL))
-        done
-
-        echo "##[section]Git tag '$TAG' has been detected on origin! Proceeding with release."
-      else
-        echo "##vso[task.logissue type=error]Release tag '$TAG' does not exist on origin."
-        exit 1
-      fi
-    else
-      echo "##[section]Using existing Git tag '$TAG' for GitHub release."
-    fi
-
     repo_slug="${{ parameters.buildRepositoryName }}"
+
     if [[ -z "$repo_slug" || "$repo_slug" == '$(Build.Repository.Name)' ]]; then
       remote_url="$(git remote get-url origin 2>/dev/null || true)"
       if [[ -z "$remote_url" ]]; then
@@ -83,6 +44,11 @@ steps:
         echo "##vso[task.logissue type=error]Origin remote '$remote_url' is not a recognized GitHub repository URL"
         exit 1
       fi
+    fi
+
+    if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+      echo "##vso[task.logissue type=error]Release tag '$TAG' does not exist on origin."
+      exit 1
     fi
 
     echo "##[section]Using GitHub repository slug '$repo_slug' for release creation."

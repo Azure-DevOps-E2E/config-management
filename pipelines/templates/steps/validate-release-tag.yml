@@ -2,29 +2,13 @@ parameters:
 - name: releaseTag
   type: string
   default: '$(releaseTag)'
-- name: autoCreate
-  type: boolean
-  default: false
-- name: waitIfMissing
-  type: boolean
-  default: true
-- name: timeoutMinutes
-  type: number
-  default: 30
 
 steps:
 - bash: |
     set -euo pipefail
 
     TAG="${{ parameters.releaseTag }}"
-    RAW_AUTO_CREATE="${{ parameters.autoCreate }}"
-    AUTO_CREATE=$(echo "$RAW_AUTO_CREATE" | tr '[:upper:]' '[:lower:]')
-    RAW_WAIT="${{ parameters.waitIfMissing }}"
-    WAIT_IF_MISSING=$(echo "$RAW_WAIT" | tr '[:upper:]' '[:lower:]')
-    TIMEOUT_MINUTES=${{ parameters.timeoutMinutes }}
-    TIMEOUT_SECONDS=$((TIMEOUT_MINUTES * 60))
-    SLEEP_INTERVAL=20
-    
+
     if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       echo "##vso[task.logissue type=error]Release tag '$TAG' must match format v<major>.<minor>.<patch> (e.g., v1.0.119)"
       exit 1
@@ -35,34 +19,8 @@ steps:
     if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
       echo "##[section]Using existing Git tag '$TAG' for release."
     else
-      if [ "$AUTO_CREATE" = "true" ] || [ "$AUTO_CREATE" = "1" ]; then
-        echo "##[section]Release tag '$TAG' does not exist on origin. Auto-creating Git tag..."
-        git config user.name 'azure-pipelines[bot]'
-        git config user.email 'azure-pipelines@users.noreply.github.com'
-        git tag "$TAG"
-        git push origin "$TAG"
-        echo "##[section]Successfully created and pushed Git tag '$TAG' to origin."
-      elif [ "$WAIT_IF_MISSING" = "true" ] || [ "$WAIT_IF_MISSING" = "1" ]; then
-        echo "##vso[task.logissue type=warning]Git tag '$TAG' does not exist on remote origin."
-        echo "##[warning]NOTIFICATION: Please create and push tag '$TAG' to origin (e.g. 'git tag $TAG && git push origin $TAG')."
-        echo "##[section]Waiting up to $TIMEOUT_MINUTES minutes for tag '$TAG' to be created..."
-
-        ELAPSED=0
-        while ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; do
-          if [ "$ELAPSED" -ge "$TIMEOUT_SECONDS" ]; then
-            echo "##vso[task.logissue type=error]Timeout reached ($TIMEOUT_MINUTES minutes). Git tag '$TAG' was not created on origin."
-            exit 1
-          fi
-          echo "Waiting for tag '$TAG'... (${ELAPSED}s / ${TIMEOUT_SECONDS}s elapsed)"
-          sleep "$SLEEP_INTERVAL"
-          ELAPSED=$((ELAPSED + SLEEP_INTERVAL))
-        done
-
-        echo "##[section]Git tag '$TAG' has been detected on origin! Proceeding with release."
-      else
-        echo "##vso[task.logissue type=error]Release tag '$TAG' does not exist on origin."
-        echo "Please create the Git tag first or set autoCreate / waitIfMissing to true."
-        exit 1
-      fi
+      echo "##vso[task.logissue type=error]Release tag '$TAG' does not exist on origin."
+      echo "Please create the Git tag first, then rerun the release workflow."
+      exit 1
     fi
   displayName: 'Validate and resolve release Git tag'

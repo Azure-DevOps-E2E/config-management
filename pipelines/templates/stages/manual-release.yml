@@ -1,0 +1,120 @@
+parameters:
+- name: serviceName
+  type: string
+
+stages:
+- stage: Release
+  displayName: 'Promote and release - ${{ parameters.serviceName }}'
+  jobs:
+  - job: Resolve
+    displayName: 'Validate dev-to-main promotion source'
+    steps:
+    - checkout: self
+      clean: true
+      fetchDepth: 0
+      persistCredentials: true
+      displayName: 'Checkout full Git history'
+
+    - template: steps/container/resolve-candidate.yml@templates
+
+  - job: ValidateTag
+    displayName: 'Require an existing release Git tag'
+    dependsOn: Resolve
+    condition: and(succeeded(), eq(dependencies.Resolve.outputs['resolveCandidate.shouldPromote'], 'true'))
+    steps:
+    - checkout: self
+      clean: true
+      fetchDepth: 1
+      persistCredentials: true
+      displayName: 'Checkout source for tag validation'
+
+    - template: steps/validate-release-tag.yml@templates
+      parameters:
+        releaseTag: '$(releaseTag)'
+
+  - job: Promote
+    displayName: 'Retag candidate for PROD without rebuild'
+    dependsOn:
+    - Resolve
+    - ValidateTag
+    condition: and(succeeded(), eq(dependencies.Resolve.outputs['resolveCandidate.shouldPromote'], 'true'))
+    variables:
+    - name: candidateSourceVersion
+      value: $[ dependencies.Resolve.outputs['resolveCandidate.candidateSourceVersion'] ]
+    steps:
+    - checkout: none
+
+    - bash: |
+        set -euo pipefail
+        if [[ ! "$(releaseTag)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "releaseTag must match v<major>.<minor>.<patch>, for example v1.0.119"
+          exit 1
+        fi
+      displayName: 'Validate release tag'
+
+    - task: Docker@2
+      displayName: 'Sign in to ACR'
+      inputs:
+        command: login
+        containerRegistry: 'acrLoginServer'
+
+    - template: steps/container/promote.yml@templates
+      parameters:
+        registry: '$(acrLoginServer)'
+        repository: '$(imageRepository)'
+        candidateTag: '$(candidateSourceVersion)'
+        releaseTag: '$(releaseTag)'
+
+    - task: Docker@2
+      displayName: 'Sign out of ACR'
+      condition: always()
+      inputs:
+        command: logout
+        containerRegistry: 'acrLoginServer'
+
+  - deployment: UpdateManifest
+    displayName: 'Commit release tag to PROD values'
+    dependsOn: Promote
+    environment: Production
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: templates
+            clean: true
+            fetchDepth: 0
+            persistCredentials: true
+            path: s/templates
+            displayName: 'Checkout writable config repository'
+
+          - bash: |
+              set -euo pipefail
+              bash "$(Pipeline.Workspace)/s/templates/scripts/update-manifest.sh" \
+                --service-name "$(serviceName)" \
+                --environment prod \
+                --registry "$(acrLoginServer)" \
+                --image-tag "$(releaseTag)" \
+                --repository-root "$(Pipeline.Workspace)/s/templates"
+            name: updateManifest
+            displayName: 'Update and push PROD manifest'
+
+  - job: GitHubRelease
+    displayName: 'Create GitHub Release'
+    dependsOn:
+    - UpdateManifest
+    - Promote
+    - Resolve
+    condition: succeeded()
+    variables:
+    - name: promotedImageDigest
+      value: $[ dependencies.Promote.outputs['promoteImage.promotedImageDigest'] ]
+    - name: candidateSourceVersion
+      value: $[ dependencies.Resolve.outputs['resolveCandidate.candidateSourceVersion'] ]
+    steps:
+    - checkout: self
+      clean: true
+      fetchDepth: 0
+      persistCredentials: true
+      displayName: 'Checkout source for release creation'
+
+    - template: steps/create-github-release.yml@templates

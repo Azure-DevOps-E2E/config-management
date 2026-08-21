@@ -1,6 +1,6 @@
 # NexusCart Azure Pipelines
 
-The five runtime repositories each own three branch-focused Azure Pipelines.
+The five runtime repositories each own four branch-focused Azure Pipelines.
 Every YAML file declares its trigger, variables, stages, jobs, and Azure-native
 tasks. Active service pipelines use this repository only for the minimal
 required contract and reusable script implementations.
@@ -12,7 +12,7 @@ required contract and reusable script implementations.
 | Push to `feature/*` | `<service>-ci`: `CI` | Test, coverage, lint, and build validation only |
 | Open or update a PR targeting `dev` or `main` | `<service>-ci`: `CI` | Validate the GitHub PR merge commit; no image build or deployment |
 | Push or merge to `dev` | `<service>-dev`: `CI -> BuildCandidate -> UpdateManifest` | Build once, scan, push an immutable candidate, then commit its tag to `values-dev.yaml` |
-| Merge `dev` into `main` | `<service>-prod`: `CI -> ResolveCandidate -> ValidateReleaseTag -> PromoteImage -> UpdateManifest -> Release` | Require an existing release Git tag, promote the exact DEV image without rebuilding, commit `values-prod.yaml`, then create a GitHub Release |
+| Merge `dev` into `main` | `<service>-prod`: `CI -> ResolveCandidate`; then queue `<service>-release` manually | Validate the merge source and resolve the exact DEV candidate without rebuilding; the manual release workflow then promotes the image, updates `values-prod.yaml`, and creates the GitHub Release |
 | Direct push to `main` | `<service>-prod`: `CI -> ResolveCandidate` | CI runs, but production promotion is skipped because the commit did not come from `dev` |
 
 Pull-request validation is enabled only in `azure-pipelines.yml` for target
@@ -30,26 +30,23 @@ promotions because they cannot be mapped safely to an immutable DEV image.
 
 ## Pipeline ownership
 
-Every runtime repository keeps the operational shape visible in three entry
+Every runtime repository keeps the operational shape visible in four entry
 points:
 
 ```text
-azure-pipelines.yml       # feature/*: CI
-azure-pipelines-dev.yml   # dev: CI, candidate build, DEV manifest update
-azure-pipelines-prod.yml  # main: CI, promote, PROD manifest update, release
+azure-pipelines.yml         # feature/*: CI
+azure-pipelines-dev.yml     # dev: CI, candidate build, DEV manifest update
+azure-pipelines-prod.yml    # main: CI, candidate resolution only
+azure-pipelines-release.yml # manual: promote, PROD manifest update, GitHub Release
 ```
 
-Create three Azure Pipeline definitions for each service and point them to
-those files. Use the names `<service>-ci`, `<service>-dev`, and
-`<service>-prod`.
+Create four Azure Pipeline definitions for each service and point them to
+those files. Use the names `<service>-ci`, `<service>-dev`, `<service>-prod`,
+and `<service>-release`.
 
 Azure-native operations stay inline in each service pipeline, including
 checkout, report publication, Docker, Bash, deployment jobs, Git tagging, and
-GitHub Release API calls. Shared scripts run language quality checks in disposable
-containers and implement Trivy scanning, candidate resolution, digest-safe
-image promotion, and manifest updates.
-
-The required outer contract is:
+Azure-native operations stay inline in each service pipeline, including checkout, report publication, Docker, Bash, deployment jobs, Git tagging, and GitHub Release API calls. The manual release pipeline keeps image promotion, manifest updates, and GitHub Release creation visible.The required outer contract is:
 
 ```yaml
 extends:
@@ -59,8 +56,6 @@ extends:
     - stage: CI
       # jobs and steps remain visible here
 ```
-
-## Containerized CI quality
 
 Self-hosted agents do not need Java, Maven, Node.js, Python, or Go installed.
 Each quality job pulls one version-matched Docker Official Image, runs all
@@ -93,8 +88,9 @@ The `dev` pipeline builds and scans these tags:
 <acr>/<service>:dev
 ```
 
-A qualifying `main` pipeline resolves the commit merged from `dev`, pulls
-`<dev-commit-sha>`, and retags that same image as:
+A qualifying `main` pipeline resolves the commit merged from `dev`. The
+separate manual release pipeline then pulls `<dev-commit-sha>` and retags that
+same image as:
 
 ```text
 <acr>/<service>:<releaseTag>
@@ -106,9 +102,9 @@ fails if the candidate is missing or if any digest changes. There is no
 production rebuild or fallback build.
 
 The DEV pipeline commits the immutable dev commit tag to
-`deploy/helm/<service>/values-dev.yaml`. After promotion and the `Production`
-environment approval, the PROD pipeline commits the immutable release tag to
-`values-prod.yaml`. Direct Helm deployment and runtime verification remain
+`deploy/helm/<service>/values-dev.yaml`. After the merge pipeline resolves the
+exact candidate, the manual release pipeline commits the immutable release tag
+to `values-prod.yaml`. Direct Helm deployment and runtime verification remain
 disabled until AKS and public endpoints are available. The mutable `dev` and
 `prod` tags are convenience pointers only.
 
@@ -117,29 +113,29 @@ start the separate `system-e2e` pipeline.
 
 ## Git tag and GitHub Release
 
-The PROD pipeline exposes a runtime `releaseTag` input before promotion. Use an
-existing strict semantic tag such as `v1.0.119`; the pipeline validates
+The PROD pipeline only validates the merge source. After `dev` is merged into
+`main`, queue the separate manual release pipeline and provide an existing
+strict semantic tag such as `v1.0.119`. The manual workflow validates
 `v<major>.<minor>.<patch>` and checks that `refs/tags/<releaseTag>` already
-exists on origin before retagging the candidate image. If the tag is missing,
-the run stops before image promotion and the operator must create or choose an
-existing Git tag, then rerun the pipeline with that `releaseTag`.
+exists on origin before promotion. If the tag is missing, the run stops before
+image promotion and the operator must create or choose an existing Git tag,
+then rerun the manual release pipeline with that `releaseTag`.
 
-After the PROD manifest commit succeeds, the release job uses the persisted
-GitHub checkout credentials and the checkout origin remote to:
+The manual release workflow then:
 
-1. confirm the requested Git tag still exists on GitHub;
-2. resolve the GitHub repository slug as `owner/repo`;
-3. skip creation if a release already exists for that tag;
-4. create a GitHub Release through the GitHub API with the same tag;
-5. include the promoted image, digest, DEV candidate commit, and PROD commit.
+1. confirms the requested Git tag still exists on GitHub;
+2. resolves the GitHub repository slug as `owner/repo`;
+3. promotes the exact DEV image without rebuilding;
+4. commits `values-prod.yaml`;
+5. creates a GitHub Release through the GitHub API with the same tag;
+6. includes the promoted image, digest, DEV candidate commit, and PROD commit.
 
-The GitHub Release is therefore not created when tag validation, Production
-approval, image promotion, or manifest update fails. The pipeline does not
-create or push Git tags; release tags must exist before promotion.
+The pipeline does not create or push Git tags; release tags must exist before
+promotion.
 
 ## Required Azure DevOps configuration
 
-Create and authorize variable group `nexuscart-shared` for the DEV and PROD
+Create and authorize variable group `nexuscart-shared` for the DEV, PROD, and manual release
 pipelines in all five runtime repositories. Feature CI deliberately does not
 load the deployment variable group:
 
@@ -188,11 +184,11 @@ external template.
 
 | Azure Pipelines | YAML sources |
 |---|---|
-| `frontend ci`, `frontend dev`, `frontend prod` | `frontend/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
-| `api-gateway ci`, `api-gateway dev`, `api-gateway prod` | `api-gateway/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
-| `user-service ci`, `user-service dev`, `user-service prod` | `user-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
-| `catalog-service ci`, `catalog-service dev`, `catalog-service prod` | `catalog-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
-| `order-service ci`, `order-service dev`, `order-service prod` | `order-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml` |
+| `frontend ci`, `frontend dev`, `frontend prod`, `frontend release` | `frontend/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml`, `azure-pipelines-release.yml` |
+| `api-gateway ci`, `api-gateway dev`, `api-gateway prod`, `api-gateway release` | `api-gateway/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml`, `azure-pipelines-release.yml` |
+| `user-service ci`, `user-service dev`, `user-service prod`, `user-service release` | `user-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml`, `azure-pipelines-release.yml` |
+| `catalog-service ci`, `catalog-service dev`, `catalog-service prod`, `catalog-service release` | `catalog-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml`, `azure-pipelines-release.yml` |
+| `order-service ci`, `order-service dev`, `order-service prod`, `order-service release` | `order-service/azure-pipelines.yml`, `azure-pipelines-dev.yml`, `azure-pipelines-prod.yml`, `azure-pipelines-release.yml` |
 | `system-e2e` | `config-management/pipelines/system-e2e.yml` |
 
 Push `config-management` before a runtime repository so the referenced
