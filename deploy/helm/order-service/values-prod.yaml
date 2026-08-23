@@ -12,6 +12,6 @@ resources:
 # BEGIN AZURE PIPELINES MANAGED IMAGE
 image:
   repository: devopse2e.azurecr.io/order-service
-  tag: "v2.0.2"
-appVersion: "v2.0.2"
+  tag: "v3.0.3"
+appVersion: "v3.0.3"
 # END AZURE PIPELINES MANAGED IMAGE
