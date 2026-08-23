@@ -11,6 +11,6 @@ resources:
 # BEGIN AZURE PIPELINES MANAGED IMAGE
 image:
   repository: devopse2e.azurecr.io/frontend
-  tag: "1efe9278030fa0c554c652cd9cac5c3cfd0af73b"
-appVersion: "1efe9278030fa0c554c652cd9cac5c3cfd0af73b"
+  tag: "b2c44547acf3824f36a03cf62267f8f7c0cec86c"
+appVersion: "b2c44547acf3824f36a03cf62267f8f7c0cec86c"
 # END AZURE PIPELINES MANAGED IMAGE
