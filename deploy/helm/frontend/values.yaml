@@ -20,7 +20,10 @@ health:
   readinessInitialDelaySeconds: 3
   livenessInitialDelaySeconds: 10
 
-env: []
+# env: []
+env:
+  - name: NGINX_ENVSUBST_FILTER
+    value: '^(APP_VERSION|APP_IMAGE_TAG)$'
 
 podAnnotations: {}
 podSecurityContext: {}
