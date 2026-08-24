@@ -121,3 +121,6 @@ stages:
       displayName: 'Checkout source for release creation'
 
     - template: ../steps/create-github-release.yml@templates
+      parameters:
+        releaseTag: ${{ parameters.releaseTag }}
+        serviceName: ${{ parameters.serviceName }}
