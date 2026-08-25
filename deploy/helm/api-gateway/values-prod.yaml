@@ -1,7 +1,8 @@
 replicaCount: 2
 
 service:
-  type: LoadBalancer
+  type: NodePort
+  nodePort: 30190
 
 resources:
   requests:

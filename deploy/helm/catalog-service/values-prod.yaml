@@ -1,5 +1,9 @@
 replicaCount: 2
 
+service:
+  type: NodePort
+  nodePort: 30182
+
 resources:
   requests:
     cpu: 200m

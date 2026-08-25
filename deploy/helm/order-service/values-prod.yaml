@@ -1,6 +1,10 @@
 # Order data is in-memory; keep one replica until shared persistence is added.
 replicaCount: 1
 
+service:
+  type: NodePort
+  nodePort: 30183
+
 resources:
   requests:
     cpu: 300m
