@@ -51,7 +51,8 @@ grafana:
   ingress:
     enabled: false
   service:
-    type: ClusterIP
+    type: NodePort
+    nodePort: 30200
   persistence:
     enabled: true
     type: sts
